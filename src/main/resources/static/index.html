@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Master</title>
+    <style>
+        :root {
+            --light-square: #f0d9b5;
+            --dark-square: #b58863;
+            --highlight: rgba(0, 200, 255, 0.5);
+            --valid-move: rgba(0, 255, 0, 0.5);
+            --capture-move: rgba(255, 0, 0, 0.3);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #2c3e50;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        h1 {
+            color: #f1c40f;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+            margin-bottom: 5px;
+        }
+        
+        .status {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .game-container {
+            display: flex;
+            gap: 30px;
+            max-width: 1000px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .board-container {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 2px solid #2c3e50;
+            width: 480px;
+            height: 480px;
+        }
+        
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .white { background: var(--light-square); }
+        .black { background: var(--dark-square); }
+        
+        .white-piece { color: white; text-shadow: 1px 1px 3px #333; }
+        .black-piece { color: #222; text-shadow: 1px 1px 2px #777; }
+        
+        .selected { background-color: var(--highlight) !important; }
+        .valid-move { background-color: var(--valid-move) !important; }
+        .capture::before {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: var(--capture-move);
+        }
+        
+        .controls {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 250px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            color: #f1c40f;
+            border-bottom: 2px solid #f1c40f;
+            padding-bottom: 5px;
+        }
+        
+        button {
+            background: #f1c40f;
+            color: #2c3e50;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px 0;
+            width: 100%;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #f39c12;
+            transform: translateY(-2px);
+        }
+        
+        .turn-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .turn-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #2c3e50;
+        }
+        
+        .white-turn { background: var(--light-square); }
+        .black-turn { background: var(--dark-square); }
+        
+        .active-turn {
+            box-shadow: 0 0 0 3px #f1c40f;
+        }
+        
+        @media (max-width: 768px) {
+            .chessboard {
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
+                width: 320px;
+                height: 320px;
+            }
+            
+            .square {
+                width: 40px;
+                height: 40px;
+                font-size: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Chess Master</h1>
+    <div class="status" id="gameStatus">White's Turn</div>
+    
+    <div class="game-container">
+        <div class="board-container">
+            <div class="chessboard" id="chessboard"></div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <h2>Game Controls</h2>
+                <button id="resetBtn">Reset Game</button>
+                <button id="undoBtn">Undo Move</button>
+            </div>
+            
+            <div class="control-group">
+                <h2>Player Turn</h2>
+                <div class="turn-indicator">
+                    <div class="turn-circle white-turn active-turn" id="whiteTurn"></div>
+                    <span>White</span>
+                    <div class="turn-circle black-turn" id="blackTurn"></div>
+                    <span>Black</span>
+                </div>
+                <button id="botMoveBtn">Make Bot Move</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pieceMap = {
+            PAWN: "♟", ROOK: "♜", KNIGHT: "♞", BISHOP: "♝", 
+            QUEEN: "♛", KING: "♚"
+        };
+
+        let selectedPiece = null;
+        let validMoves = [];
+        let currentTurn = "white";
+
+        function updateTurnIndicator() {
+            const whiteTurn = document.getElementById('whiteTurn');
+            const blackTurn = document.getElementById('blackTurn');
+            const gameStatus = document.getElementById('gameStatus');
+            
+            if (currentTurn === "white") {
+                whiteTurn.classList.add('active-turn');
+                blackTurn.classList.remove('active-turn');
+                gameStatus.textContent = "White's Turn";
+            } else {
+                blackTurn.classList.add('active-turn');
+                whiteTurn.classList.remove('active-turn');
+                gameStatus.textContent = "Black's Turn";
+            }
+        }
+
+        function loadBoard() {
+            fetch("/board")
+                .then(res => res.json())
+                .then(data => {
+                    const boardEl = document.getElementById("chessboard");
+                    boardEl.innerHTML = "";
+                    
+                    for (let i = 0; i < 8; i++) {
+                        for (let j = 0; j < 8; j++) {
+                            const cell = document.createElement("div");
+                            const isWhite = (i + j) % 2 === 0;
+                            cell.className = `square ${isWhite ? "white" : "black"}`;
+                            
+                            const piece = data[i][j];
+                            if (piece) {
+                                const symbol = pieceMap[piece.type] || "";
+                                cell.textContent = symbol;
+                                cell.classList.add(piece.color.toLowerCase() + "-piece");
+                            }
+                            
+                            // Highlight selected piece
+                            if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
+                                cell.classList.add("selected");
+                            }
+                            
+                            // Highlight valid moves
+                            if (validMoves.some(move => move.row === i && move.col === j)) {
+                                cell.classList.add("valid-move");
+                                if (piece) {
+                                    cell.classList.add("capture");
+                                }
+                            }
+                            
+                            cell.addEventListener("click", () => handleCellClick(i, j, piece));
+                            boardEl.appendChild(cell);
+                        }
+                    }
+                });
+        }
+
+        function handleCellClick(row, col, piece) {
+            if (!selectedPiece) {
+                if (piece && piece.color === currentTurn) {
+                    selectedPiece = { row, col, color: piece.color };
+                    calculateValidMoves(row, col, piece);
+                }
+            } else {
+                if (selectedPiece.row === row && selectedPiece.col === col) {
+                    // Clicked same piece - deselect
+                    selectedPiece = null;
+                    validMoves = [];
+                    loadBoard();
+                    return;
+                }
+                
+                const isValidMove = validMoves.some(move => 
+                    move.row === row && move.col === col
+                );
+                
+                if (isValidMove) {
+                    const move = {
+                        fromRow: selectedPiece.row,
+                        fromCol: selectedPiece.col,
+                        toRow: row,
+                        toCol: col,
+                        color: selectedPiece.color
+                    };
+                    
+                    sendMove(move);
+                }
+                
+                selectedPiece = null;
+                validMoves = [];
+            }
+        }
+
+        function calculateValidMoves(row, col, piece) {
+            // In a real implementation, this would calculate actual valid moves
+            // For demo purposes, we'll just highlight all empty squares
+            validMoves = [];
+            fetch("/board")
+                .then(res => res.json())
+                .then(data => {
+                    for (let i = 0; i < 8; i++) {
+                        for (let j = 0; j < 8; j++) {
+                            if (i === row && j === col) continue;
+                            const targetPiece = data[i][j];
+                            if (!targetPiece || targetPiece.color !== piece.color) {
+                                validMoves.push({ row: i, col: j });
+                            }
+                        }
+                    }
+                    loadBoard();
+                });
+        }
+
+        function sendMove(move) {
+            fetch("/move", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(move)
+            })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success) {
+                    currentTurn = currentTurn === "white" ? "black" : "white";
+                    updateTurnIndicator();
+                }
+                loadBoard();
+            });
+        }
+
+        function resetGame() {
+            fetch("/reset", {
+                method: "POST"
+            })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success) {
+                    selectedPiece = null;
+                    validMoves = [];
+                    currentTurn = "white";
+                    updateTurnIndicator();
+                    loadBoard();
+                }
+            });
+        }
+
+        function makeBotMove() {
+            fetch("/bot-move", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ color: "black" })
+            })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success) {
+                    currentTurn = "white";
+                    updateTurnIndicator();
+                    loadBoard();
+                }
+            });
+        }
+
+        // Initialize event listeners
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+        document.getElementById('botMoveBtn').addEventListener('click', makeBotMove);
+        
+        // Initialize the game
+        updateTurnIndicator();
+        loadBoard();
+    </script>
+</body>
+</html>
