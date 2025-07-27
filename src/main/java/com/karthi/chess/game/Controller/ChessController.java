@@ -1,6 +1,8 @@
 package com.karthi.chess.game.Controller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.InitializingBean;
@@ -14,7 +16,6 @@ import com.github.bhlangonijr.chesslib.Board;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import com.github.bhlangonijr.chesslib.move.Move;
-import com.karthi.chess.game.model.ChessAI;
 
 @RestController
 public class ChessController implements InitializingBean {
@@ -58,124 +59,67 @@ public class ChessController implements InitializingBean {
             return ResponseEntity.internalServerError().body(boardState);
         }
     }
+    @GetMapping("/test-chesslib")
 
-    @PostMapping("/move")
-    public ResponseEntity<Map<String, Object>> move(@RequestBody Map<String, Object> moveData) {
-        Map<String, Object> response = new HashMap<>();
-        
-        try {
-            // Input validation
-            if (!moveData.containsKey("fromRow") || !moveData.containsKey("fromCol") || 
-                !moveData.containsKey("toRow") || !moveData.containsKey("toCol") || 
-                !moveData.containsKey("color")) {
-                response.put("success", false);
-                response.put("message", "Missing required fields in request");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            int fromRow = (int) moveData.get("fromRow");
-            int fromCol = (int) moveData.get("fromCol");
-            int toRow = (int) moveData.get("toRow");
-            int toCol = (int) moveData.get("toCol");
-            
-            if (fromRow < 0 || fromRow > 7 || fromCol < 0 || fromCol > 7 ||
-                toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) {
-                response.put("success", false);
-                response.put("message", "Invalid board coordinates");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Color validation
-            String color = moveData.get("color").toString().toLowerCase();
-            if (!color.equals("white") && !color.equals("black")) {
-                response.put("success", false);
-                response.put("message", "Invalid color specified");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            Side playerSide = color.equals("white") ? Side.WHITE : Side.BLACK;
-
-            if (board.getSideToMove() != playerSide) {
-                response.put("success", false);
-                response.put("message", "It's not " + color + "'s turn!");
-                return ResponseEntity.ok().body(response);
-            }
-
-            // Square conversion
-            String fromNotation = String.format("%s%d", (char)('a' + fromCol), 8 - fromRow).toUpperCase();
-            String toNotation = String.format("%s%d", (char)('a' + toCol), 8 - toRow).toUpperCase();
-            
-            Square from = Square.valueOf(fromNotation);
-            Square to = Square.valueOf(toNotation);
-            
-            Move move = new Move(from, to);
-
-            if (board.isMoveLegal(move, true)) {
-                board.doMove(move);
-                response.put("success", true);
-                response.put("message", "Move successful");
-                response.put("move", move.toString());
-                return ResponseEntity.ok().body(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "Invalid move");
-                return ResponseEntity.ok().body(response);
-            }
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", "Invalid square notation: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Error processing move: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
-        }
+public String testChesslib() {
+    try {
+        Board board = new Board();
+        board.loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        return "Chesslib is working. Side to move: " + board.getSideToMove();
+    } catch (Exception e) {
+        return "Error: " + e.getMessage();
     }
+}
 
-    @PostMapping("/bot-move")
-    public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
-        Map<String, Object> response = new HashMap<>();
-        
-        try {
-            if (!request.containsKey("color")) {
-                response.put("success", false);
-                response.put("message", "Missing 'color' in request");
-                return ResponseEntity.badRequest().body(response);
-            }
 
-            String color = request.get("color").toLowerCase();
-            if (!color.equals("white") && !color.equals("black")) {
-                response.put("success", false);
-                response.put("message", "Invalid color specified");
-                return ResponseEntity.badRequest().body(response);
-            }
+   @PostMapping("/move")
+public ResponseEntity<Map<String, Object>> move(@RequestBody Map<String, Object> moveData) {
+    Map<String, Object> response = new HashMap<>();
 
-            Side aiSide = color.equals("white") ? Side.WHITE : Side.BLACK;
+    try {
+        // validate inputs...
+        int fromRow = (int) moveData.get("fromRow");
+        int fromCol = (int) moveData.get("fromCol");
+        int toRow = (int) moveData.get("toRow");
+        int toCol = (int) moveData.get("toCol");
+        String color = moveData.get("color").toString().toLowerCase();
+        Side playerSide = color.equals("white") ? Side.WHITE : Side.BLACK;
 
-            if (board.getSideToMove() != aiSide) {
-                response.put("success", false);
-                response.put("message", "Not " + color + "'s turn!");
-                return ResponseEntity.ok().body(response);
-            }
-
-            Move bestMove = ChessAI.getGreedyMove(board, aiSide);
-            if (bestMove != null) {
-                board.doMove(bestMove);
-                response.put("success", true);
-                response.put("message", "AI move successful");
-                response.put("move", bestMove.toString());
-                return ResponseEntity.ok().body(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "No valid AI moves available");
-                return ResponseEntity.ok().body(response);
-            }
-        } catch (Exception e) {
+        if (board.getSideToMove() != playerSide) {
             response.put("success", false);
-            response.put("message", "Error processing AI move: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            response.put("message", "It's not " + color + "'s turn!");
+            return ResponseEntity.ok(response);
         }
+
+        Square from = Square.valueOf(String.format("%s%d", (char)('a' + fromCol), 8 - fromRow).toUpperCase());
+        Square to = Square.valueOf(String.format("%s%d", (char)('a' + toCol), 8 - toRow).toUpperCase());
+        Move move = new Move(from, to);
+
+        if (board.isMoveLegal(move, true)) {
+            board.doMove(move);
+            response.put("success", true);
+            response.put("message", "Move successful");
+            response.put("move", move.toString());
+
+            if (board.isMated()) {
+                response.put("checkmate", true);
+                response.put("winner", color);
+            }
+
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("success", false);
+            response.put("message", "Invalid move");
+            return ResponseEntity.ok(response);
+        }
+
+    } catch (Exception e) {
+        response.put("success", false);
+        response.put("message", "Error processing move: " + e.getMessage());
+        return ResponseEntity.internalServerError().body(response);
     }
+}
+
 
     @PostMapping("/reset")
     public ResponseEntity<Map<String, Object>> resetGame() {
@@ -192,4 +136,41 @@ public class ChessController implements InitializingBean {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+    @PostMapping("/valid-moves")
+    public ResponseEntity<Map<String, Object>> getValidMoves(@RequestBody Map<String, Integer> input) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            int fromRow = input.get("row");
+            int fromCol = input.get("col");
+    
+            String fromNotation = String.format("%s%d", (char)('a' + fromCol), 8 - fromRow).toUpperCase();
+            Square fromSquare = Square.valueOf(fromNotation);
+    
+            List<Move> legalMoves = board.legalMoves();
+            List<Map<String, Integer>> validMoves = new ArrayList<>();
+    
+            for (Move move : legalMoves) {
+                if (move.getFrom() == fromSquare) {
+                    Square to = move.getTo();
+                    int toRow = 7 - to.getRank().ordinal();
+                    int toCol = to.getFile().ordinal();
+    
+                    Map<String, Integer> moveMap = new HashMap<>();
+                    moveMap.put("row", toRow);
+                    moveMap.put("col", toCol);
+                    validMoves.add(moveMap);
+                }
+            }
+    
+            response.put("success", true);
+            response.put("validMoves", validMoves);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    
 }
