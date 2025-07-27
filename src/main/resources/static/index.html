@@ -149,6 +149,18 @@
             box-shadow: 0 0 0 3px #f1c40f;
         }
         
+        .debug-panel {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 800px;
+            font-family: monospace;
+            overflow: auto;
+            max-height: 200px;
+        }
+        
         @media (max-width: 768px) {
             .chessboard {
                 grid-template-columns: repeat(8, 40px);
@@ -167,11 +179,11 @@
 </head>
 <body>
     <h1>Chess Master</h1>
-    <div class="status" id="gameStatus">White's Turn</div>
+    <div class="status" id="gameStatus">Loading game...</div>
     
     <div class="game-container">
         <div class="board-container">
-            <div class="chessboard" id="chessboard"></div>
+            <div class="chessboard" id="chessboard">Loading board...</div>
         </div>
         
         <div class="controls">
@@ -184,7 +196,7 @@
             <div class="control-group">
                 <h2>Player Turn</h2>
                 <div class="turn-indicator">
-                    <div class="turn-circle white-turn active-turn" id="whiteTurn"></div>
+                    <div class="turn-circle white-turn" id="whiteTurn"></div>
                     <span>White</span>
                     <div class="turn-circle black-turn" id="blackTurn"></div>
                     <span>Black</span>
@@ -193,8 +205,21 @@
             </div>
         </div>
     </div>
+    
+    <div class="debug-panel" id="debugPanel">
+        Debug information will appear here...
+    </div>
 
     <script>
+        // Add debug logging
+        const debugPanel = document.getElementById('debugPanel');
+        function debugLog(message) {
+            debugPanel.innerHTML += message + '<br>';
+            debugPanel.scrollTop = debugPanel.scrollHeight;
+        }
+        
+        debugLog('Initializing chess game...');
+
         const pieceMap = {
             PAWN: "♟", ROOK: "♜", KNIGHT: "♞", BISHOP: "♝", 
             QUEEN: "♛", KING: "♚"
@@ -203,11 +228,22 @@
         let selectedPiece = null;
         let validMoves = [];
         let currentTurn = "white";
+        let gameOver = false;
+
+        // DOM elements
+        const gameStatus = document.getElementById('gameStatus');
+        const whiteTurn = document.getElementById('whiteTurn');
+        const blackTurn = document.getElementById('blackTurn');
+        const resetBtn = document.getElementById('resetBtn');
+        const botMoveBtn = document.getElementById('botMoveBtn');
+        const chessboard = document.getElementById('chessboard');
+
+        // Initialize event listeners
+        resetBtn.addEventListener('click', resetGame);
+        botMoveBtn.addEventListener('click', makeBotMove);
 
         function updateTurnIndicator() {
-            const whiteTurn = document.getElementById('whiteTurn');
-            const blackTurn = document.getElementById('blackTurn');
-            const gameStatus = document.getElementById('gameStatus');
+            debugLog(`Updating turn indicator to: ${currentTurn}`);
             
             if (currentTurn === "white") {
                 whiteTurn.classList.add('active-turn');
@@ -221,54 +257,99 @@
         }
 
         function loadBoard() {
+            debugLog('Fetching board state from /board...');
+            
             fetch("/board")
-                .then(res => res.json())
-                .then(data => {
-                    const boardEl = document.getElementById("chessboard");
-                    boardEl.innerHTML = "";
-                    
-                    for (let i = 0; i < 8; i++) {
-                        for (let j = 0; j < 8; j++) {
-                            const cell = document.createElement("div");
-                            const isWhite = (i + j) % 2 === 0;
-                            cell.className = `square ${isWhite ? "white" : "black"}`;
-                            
-                            const piece = data[i][j];
-                            if (piece) {
-                                const symbol = pieceMap[piece.type] || "";
-                                cell.textContent = symbol;
-                                cell.classList.add(piece.color.toLowerCase() + "-piece");
-                            }
-                            
-                            // Highlight selected piece
-                            if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
-                                cell.classList.add("selected");
-                            }
-                            
-                            // Highlight valid moves
-                            if (validMoves.some(move => move.row === i && move.col === j)) {
-                                cell.classList.add("valid-move");
-                                if (piece) {
-                                    cell.classList.add("capture");
-                                }
-                            }
-                            
-                            cell.addEventListener("click", () => handleCellClick(i, j, piece));
-                            boardEl.appendChild(cell);
-                        }
+                .then(res => {
+                    debugLog(`Response status: ${res.status}`);
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
                     }
+                    return res.json();
+                })
+                .then(data => {
+                    debugLog('Received board data:');
+                    debugLog(JSON.stringify(data, null, 2));
+                    
+                    renderBoard(data);
+                })
+                .catch(error => {
+                    debugLog('Error loading board: ' + error.message);
+                    chessboard.innerHTML = "Error loading board. See debug panel.";
                 });
         }
 
+        function renderBoard(boardData) {
+            debugLog('Rendering board...');
+            
+            // Clear board
+            chessboard.innerHTML = "";
+            
+            // Create board cells
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const cell = document.createElement("div");
+                    const isWhite = (i + j) % 2 === 0;
+                    cell.className = `square ${isWhite ? "white" : "black"}`;
+                    
+                    const piece = boardData[i][j];
+                    if (piece) {
+                        const symbol = pieceMap[piece.type] || "?";
+                        cell.textContent = symbol;
+                        cell.classList.add(piece.color.toLowerCase() + "-piece");
+                        
+                        // Show piece type in debug
+                        cell.title = `${piece.color} ${piece.type}`;
+                        
+                        // Add check indicator
+                        if (piece.type === "KING" && piece.inCheck) {
+                            cell.classList.add("in-check");
+                            const checkIndicator = document.createElement("div");
+                            checkIndicator.className = "check-indicator";
+                            cell.appendChild(checkIndicator);
+                        }
+                    } else {
+                        cell.title = `Empty (${i},${j})`;
+                    }
+                    
+                    // Highlight selected piece
+                    if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
+                        cell.classList.add("selected");
+                    }
+                    
+                    // Highlight valid moves
+                    if (validMoves.some(move => move.row === i && move.col === j)) {
+                        cell.classList.add("valid-move");
+                        if (piece) {
+                            cell.classList.add("capture");
+                        }
+                    }
+                    
+                    cell.addEventListener("click", () => handleCellClick(i, j, piece));
+                    chessboard.appendChild(cell);
+                }
+            }
+            
+            debugLog('Board rendered successfully');
+        }
+
         function handleCellClick(row, col, piece) {
+            if (gameOver) {
+                debugLog('Game is over. Ignoring click.');
+                return;
+            }
+            
+            debugLog(`Cell clicked: (${row}, ${col}) - ${piece ? piece.type : 'Empty'}`);
+            
             if (!selectedPiece) {
                 if (piece && piece.color === currentTurn) {
+                    debugLog(`Piece selected: ${piece.color} ${piece.type}`);
                     selectedPiece = { row, col, color: piece.color };
                     calculateValidMoves(row, col, piece);
                 }
             } else {
                 if (selectedPiece.row === row && selectedPiece.col === col) {
-                    // Clicked same piece - deselect
+                    debugLog('Deselecting piece');
                     selectedPiece = null;
                     validMoves = [];
                     loadBoard();
@@ -280,6 +361,7 @@
                 );
                 
                 if (isValidMove) {
+                    debugLog(`Valid move to: (${row}, ${col})`);
                     const move = {
                         fromRow: selectedPiece.row,
                         fromCol: selectedPiece.col,
@@ -289,6 +371,8 @@
                     };
                     
                     sendMove(move);
+                } else {
+                    debugLog('Invalid move attempt');
                 }
                 
                 selectedPiece = null;
@@ -297,89 +381,148 @@
         }
 
         function calculateValidMoves(row, col, piece) {
-    validMoves = [];
-
-    fetch("/valid-moves", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ row, col })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success && data.validMoves) {
-            validMoves = data.validMoves;
-            loadBoard();
+            debugLog(`Calculating valid moves for ${piece.color} ${piece.type} at (${row},${col})`);
+            
+            validMoves = [];
+            
+            fetch("/valid-moves", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ row, col })
+            })
+            .then(res => res.json())
+            .then(data => {
+                debugLog('Valid moves response:');
+                debugLog(JSON.stringify(data));
+                
+                if (data.success && data.validMoves) {
+                    validMoves = data.validMoves;
+                    debugLog(`Found ${validMoves.length} valid moves`);
+                    loadBoard();
+                } else {
+                    debugLog('Failed to get valid moves: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                debugLog('Error fetching valid moves: ' + error.message);
+            });
         }
-    });
-}
 
-       function sendMove(move) {
-  fetch("/move", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(move)
-  })
-  .then(res => res.json())
-  .then(response => {
-    if (response.success) {
-      currentTurn = currentTurn === "white" ? "black" : "white";
-      updateTurnIndicator();
-      loadBoard();
+        function sendMove(move) {
+            debugLog(`Sending move: ${JSON.stringify(move)}`);
+            
+            fetch("/move", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(move)
+            })
+            .then(res => res.json())
+            .then(response => {
+                debugLog('Move response:');
+                debugLog(JSON.stringify(response));
+                
+                if (response.success) {
+                    currentTurn = currentTurn === "white" ? "black" : "white";
+                    updateTurnIndicator();
+                    loadBoard();
+                    
+                    // Check for checkmate
+                    if (response.checkmate) {
+                        debugLog(`Checkmate! Winner: ${response.winner}`);
+                        gameOver = true;
+                        gameStatus.textContent = `Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`;
+                        alert(`Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`);
+                    }
+                    
+                    // Auto bot move after player
+                    setTimeout(() => {
+                        if (!gameOver) makeBotMove();
+                    }, 500);
+                } else {
+                    debugLog('Move failed: ' + response.message);
+                    alert('Move failed: ' + response.message);
+                }
+            })
+            .catch(error => {
+                debugLog('Error sending move: ' + error.message);
+                alert('Error sending move');
+            });
+        }
 
-      // ⬇ Auto bot move after player
-      setTimeout(() => {
-        makeBotMove(); // Let AI play the next turn
-      }, 500); // Small delay
-    }
-  });
-}
-
+        function makeBotMove() {
+            if (gameOver) {
+                debugLog('Game over. Skipping bot move.');
+                return;
+            }
+            
+            debugLog(`Requesting bot move for ${currentTurn}`);
+            
+            fetch("/bot-move", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ color: currentTurn })
+            })
+            .then(res => res.json())
+            .then(response => {
+                debugLog('Bot move response:');
+                debugLog(JSON.stringify(response));
+                
+                if (response.success) {
+                    currentTurn = currentTurn === "white" ? "black" : "white";
+                    updateTurnIndicator();
+                    loadBoard();
+                    
+                    // Check for checkmate
+                    if (response.checkmate) {
+                        debugLog(`Checkmate! Winner: ${response.winner}`);
+                        gameOver = true;
+                        gameStatus.textContent = `Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`;
+                        alert(`Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`);
+                    }
+                } else {
+                    debugLog('Bot move failed: ' + response.message);
+                    alert('Bot move failed: ' + response.message);
+                }
+            })
+            .catch(error => {
+                debugLog('Error with bot move: ' + error.message);
+                alert('Error with bot move');
+            });
+        }
 
         function resetGame() {
+            debugLog('Resetting game...');
+            
             fetch("/reset", {
                 method: "POST"
             })
             .then(res => res.json())
             .then(response => {
+                debugLog('Reset response:');
+                debugLog(JSON.stringify(response));
+                
                 if (response.success) {
                     selectedPiece = null;
                     validMoves = [];
                     currentTurn = "white";
+                    gameOver = false;
                     updateTurnIndicator();
                     loadBoard();
+                } else {
+                    debugLog('Reset failed: ' + response.message);
+                    alert('Reset failed: ' + response.message);
                 }
+            })
+            .catch(error => {
+                debugLog('Error resetting game: ' + error.message);
+                alert('Error resetting game');
             });
         }
 
-        function makeBotMove() {
-  console.log("Sending bot move request for color:", currentTurn);
-
-  fetch("/bot-move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ color: currentTurn })  // ✅ dynamic, not hardcoded "black"
-  })
-  .then(res => res.json())
-  .then(response => {
-    console.log("Bot Move Response:", response);
-    if (response.success) {
-      currentTurn = currentTurn === "white" ? "black" : "white";
-      updateTurnIndicator();
-      loadBoard();
-    } else {
-      alert(response.message);  // Show failure reason
-    }
-  });
-}
-
-
-        // Initialize event listeners
-        document.getElementById('resetBtn').addEventListener('click', resetGame);
-        document.getElementById('botMoveBtn').addEventListener('click', makeBotMove);
-        
         // Initialize the game
+        debugLog('Game initialization complete');
         updateTurnIndicator();
         loadBoard();
     </script>
