@@ -9,6 +9,9 @@ import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.move.Move;
 
+
+
+
 public class ChessAI {
 
     public static Move getGreedyMove(Board board, Side side) {

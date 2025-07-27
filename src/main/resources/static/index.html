@@ -190,7 +190,7 @@
             <div class="control-group">
                 <h2>Game Controls</h2>
                 <button id="resetBtn">Reset Game</button>
-                <button id="undoBtn">Undo Move</button>
+                
             </div>
             
             <div class="control-group">
@@ -409,88 +409,69 @@
         }
 
         function sendMove(move) {
-            debugLog(`Sending move: ${JSON.stringify(move)}`);
-            
-            fetch("/move", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(move)
-            })
-            .then(res => res.json())
-            .then(response => {
-                debugLog('Move response:');
-                debugLog(JSON.stringify(response));
-                
-                if (response.success) {
-                    currentTurn = currentTurn === "white" ? "black" : "white";
-                    updateTurnIndicator();
-                    loadBoard();
-                    
-                    // Check for checkmate
-                    if (response.checkmate) {
-                        debugLog(`Checkmate! Winner: ${response.winner}`);
-                        gameOver = true;
-                        gameStatus.textContent = `Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`;
-                        alert(`Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`);
-                    }
-                    
-                    // Auto bot move after player
-                    setTimeout(() => {
-                        if (!gameOver) makeBotMove();
-                    }, 500);
-                } else {
-                    debugLog('Move failed: ' + response.message);
-                    alert('Move failed: ' + response.message);
-                }
-            })
-            .catch(error => {
-                debugLog('Error sending move: ' + error.message);
-                alert('Error sending move');
-            });
-        }
+    debugLog(`Sending move: ${JSON.stringify(move)}`);
+    
+    fetch("/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(move)
+    })
+    .then(res => res.json())
+    .then(response => {
+        debugLog('Move response:', response);
 
-        function makeBotMove() {
-            if (gameOver) {
-                debugLog('Game over. Skipping bot move.');
-                return;
-            }
+        if (response.success) {
+            currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
+            updateTurnIndicator();
+            loadBoard();
+
             
-            debugLog(`Requesting bot move for ${currentTurn}`);
-            
-            fetch("/bot-move", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ color: currentTurn })
-            })
-            .then(res => res.json())
-            .then(response => {
-                debugLog('Bot move response:');
-                debugLog(JSON.stringify(response));
-                
-                if (response.success) {
-                    currentTurn = currentTurn === "white" ? "black" : "white";
-                    updateTurnIndicator();
-                    loadBoard();
-                    
-                    // Check for checkmate
-                    if (response.checkmate) {
-                        debugLog(`Checkmate! Winner: ${response.winner}`);
-                        gameOver = true;
-                        gameStatus.textContent = `Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`;
-                        alert(`Checkmate! ${response.winner === 'white' ? 'White' : 'Black'} wins!`);
-                    }
-                } else {
-                    debugLog('Bot move failed: ' + response.message);
-                    alert('Bot move failed: ' + response.message);
-                }
-            })
-            .catch(error => {
-                debugLog('Error with bot move: ' + error.message);
-                alert('Error with bot move');
-            });
+        } else {
+            debugLog('Invalid move: ' + response.message);
+            alert(response.message);
         }
+    })
+    .catch(error => {
+        debugLog('Error sending move:', error.message);
+        alert('Move failed!');
+    });
+}
+
+
+       function makeBotMove() {
+    if (gameOver) {
+        debugLog("Game over - skipping bot move");
+        return;
+    }
+
+    debugLog(`Requesting bot move...`);
+
+    fetch("/bot-move", {
+        method: "POST"
+    })
+    .then(res => res.json())
+    .then(response => {
+        debugLog("Bot move response:", response);
+
+        if (response.success) {
+            currentTurn = response.currentTurn;
+            updateTurnIndicator();
+            loadBoard();
+
+            if (response.gameStatus && response.gameStatus.includes("mate")) {
+                gameOver = true;
+                const winner = response.gameStatus.includes("white") ? "White" : "Black";
+                gameStatus.textContent = `Checkmate! ${winner} wins!`;
+                alert(`Checkmate! ${winner} wins!`);
+            }
+        } else {
+            alert(response.message);
+        }
+    })
+    .catch(error => {
+        alert("Error making bot move: " + error.message);
+    });
+}
 
         function resetGame() {
             debugLog('Resetting game...');

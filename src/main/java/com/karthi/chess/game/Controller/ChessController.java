@@ -96,36 +96,34 @@ public class ChessController implements InitializingBean {
     }
 
     @PostMapping("/bot-move")
-    public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            String color = request.get("color").toLowerCase();
-            Side aiSide = color.equals("white") ? Side.WHITE : Side.BLACK;
+public ResponseEntity<Map<String, Object>> botMove() {
+    Map<String, Object> response = new HashMap<>();
+    try {
+        Side aiSide = board.getSideToMove();
 
-            if (board.getSideToMove() != aiSide) {
-                response.put("success", false);
-                response.put("message", "Not " + color + "'s turn!");
-                return ResponseEntity.ok(response);
-            }
+        Move bestMove = ChessAI.getGreedyMove(board, aiSide);
+        if (bestMove != null && board.isMoveLegal(bestMove, true)) {
+            board.doMove(bestMove);
 
-            Move bestMove = ChessAI.getGreedyMove(board, aiSide);
+            response.put("success", true);
+            response.put("move", bestMove.toString());
+            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
+            response.put("gameStatus", getCurrentGameStatus());
 
-            if (bestMove != null && board.isMoveLegal(bestMove, true)) {
-                board.doMove(bestMove);
-                response.put("success", true);
-                response.put("move", bestMove.toString());
-                response.put("gameStatus", getCurrentGameStatus());
-            } else {
-                response.put("success", false);
-                response.put("message", "No legal moves available.");
-            }
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } else {
             response.put("success", false);
-            response.put("message", "Error: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            response.put("message", "No legal moves available.");
+            return ResponseEntity.ok(response);
         }
+
+    } catch (Exception e) {
+        response.put("success", false);
+        response.put("message", "Error: " + e.getMessage());
+        return ResponseEntity.internalServerError().body(response);
     }
+}
+
 
     @PostMapping("/valid-moves")
     public ResponseEntity<Map<String, Object>> getValidMoves(@RequestBody Map<String, Integer> input) {
