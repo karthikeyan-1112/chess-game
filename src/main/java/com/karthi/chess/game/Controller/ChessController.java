@@ -95,28 +95,50 @@ public class ChessController implements InitializingBean {
         }
     }
 
-    @PostMapping("/bot-move")
-public ResponseEntity<Map<String, Object>> botMove() {
+   @PostMapping("/bot-move")
+public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
     Map<String, Object> response = new HashMap<>();
     try {
-        Side aiSide = board.getSideToMove();
+        String color = request.get("color").toLowerCase();
+        Side aiSide = color.equals("white") ? Side.WHITE : Side.BLACK;
+
+        // ❗ Check for game over BEFORE moving
+        if (board.isMated()) {
+            response.put("success", false);
+            response.put("message", "Game over: " + (aiSide == Side.WHITE ? "White" : "Black") + " is checkmated.");
+            response.put("gameStatus", "checkmate-" + (aiSide == Side.WHITE ? "white" : "black"));
+            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
+            return ResponseEntity.ok(response);
+        }
+        if (board.isDraw()) {
+            response.put("success", false);
+            response.put("message", "Game ended in draw.");
+            response.put("gameStatus", "draw");
+            return ResponseEntity.ok(response);
+        }
+
+        // Ensure it's AI's turn
+        if (board.getSideToMove() != aiSide) {
+            response.put("success", false);
+            response.put("message", "Not " + color + "'s turn!");
+            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
+            return ResponseEntity.ok(response);
+        }
 
         Move bestMove = ChessAI.getGreedyMove(board, aiSide);
         if (bestMove != null && board.isMoveLegal(bestMove, true)) {
             board.doMove(bestMove);
-
             response.put("success", true);
             response.put("move", bestMove.toString());
-            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
             response.put("gameStatus", getCurrentGameStatus());
-
-            return ResponseEntity.ok(response);
+            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
         } else {
             response.put("success", false);
             response.put("message", "No legal moves available.");
-            return ResponseEntity.ok(response);
+            response.put("gameStatus", getCurrentGameStatus());
         }
 
+        return ResponseEntity.ok(response);
     } catch (Exception e) {
         response.put("success", false);
         response.put("message", "Error: " + e.getMessage());

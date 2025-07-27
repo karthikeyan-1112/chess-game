@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Master</title>
+    
+
     <style>
         :root {
             --light-square: #f0d9b5;
@@ -14,6 +16,7 @@
         }
         
         body {
+
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #2c3e50;
             color: white;
@@ -24,11 +27,22 @@
             align-items: center;
         }
         
+        
+        
         h1 {
             color: #f1c40f;
             text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
             margin-bottom: 5px;
         }
+
+        .mode-selector {
+    margin-bottom: 15px;
+    background: #34495e;
+    padding: 10px 15px;
+    border-radius: 8px;
+    color: white;
+}
+
         
         .status {
             background: rgba(0, 0, 0, 0.3);
@@ -179,6 +193,18 @@
 </head>
 <body>
     <h1>Chess Master</h1>
+    <div class="mode-selector">
+    <label>
+        <input type="radio" name="mode" value="player" checked> Player vs Player
+    </label>
+    <label>
+        <input type="radio" name="mode" value="bot"> Player vs Bot
+    </label>
+    <select id="sideSelect">
+        <option value="white" selected>You play White</option>
+        <option value="black">You play Black</option>
+    </select>
+</div>
     <div class="status" id="gameStatus">Loading game...</div>
     
     <div class="game-container">
@@ -211,7 +237,24 @@
     </div>
 
     <script>
-        // Add debug logging
+        let gameMode = "player"; // "player" or "bot"
+let playerSide = "white"; // used in bot mode
+
+// Handle mode and side selection
+document.querySelectorAll('input[name="mode"]').forEach(el => {
+    el.addEventListener("change", () => {
+        gameMode = el.value;
+        document.getElementById("sideSelect").style.display = gameMode === "bot" ? "inline-block" : "none";
+        resetGame();
+    });
+});
+
+document.getElementById("sideSelect").addEventListener("change", (e) => {
+    playerSide = e.target.value;
+    resetGame();
+});
+
+        // Add deffuncTug logging
         const debugPanel = document.getElementById('debugPanel');
         function debugLog(message) {
             debugPanel.innerHTML += message + '<br>';
@@ -332,53 +375,54 @@
             
             debugLog('Board rendered successfully');
         }
+function handleCellClick(row, col, piece) {
+    if (gameOver) {
+        debugLog('Game is over. Ignoring click.');
+        return;
+    }
 
-        function handleCellClick(row, col, piece) {
-            if (gameOver) {
-                debugLog('Game is over. Ignoring click.');
-                return;
-            }
-            
-            debugLog(`Cell clicked: (${row}, ${col}) - ${piece ? piece.type : 'Empty'}`);
-            
-            if (!selectedPiece) {
-                if (piece && piece.color === currentTurn) {
-                    debugLog(`Piece selected: ${piece.color} ${piece.type}`);
-                    selectedPiece = { row, col, color: piece.color };
-                    calculateValidMoves(row, col, piece);
-                }
-            } else {
-                if (selectedPiece.row === row && selectedPiece.col === col) {
-                    debugLog('Deselecting piece');
-                    selectedPiece = null;
-                    validMoves = [];
-                    loadBoard();
-                    return;
-                }
-                
-                const isValidMove = validMoves.some(move => 
-                    move.row === row && move.col === col
-                );
-                
-                if (isValidMove) {
-                    debugLog(`Valid move to: (${row}, ${col})`);
-                    const move = {
-                        fromRow: selectedPiece.row,
-                        fromCol: selectedPiece.col,
-                        toRow: row,
-                        toCol: col,
-                        color: selectedPiece.color
-                    };
-                    
-                    sendMove(move);
-                } else {
-                    debugLog('Invalid move attempt');
-                }
-                
-                selectedPiece = null;
-                validMoves = [];
-            }
+    debugLog(`Cell clicked: (${row}, ${col}) - ${piece ? piece.type : 'Empty'}`);
+
+    if (!selectedPiece) {
+        if (piece && piece.color === currentTurn && (gameMode === "player" || playerSide === piece.color))
+ {
+            debugLog(`Piece selected: ${piece.color} ${piece.type}`);
+            selectedPiece = { row, col, color: piece.color };
+            calculateValidMoves(row, col, piece);
         }
+    } else {
+        if (selectedPiece.row === row && selectedPiece.col === col) {
+            debugLog('Deselecting piece');
+            selectedPiece = null;
+            validMoves = [];
+            loadBoard();
+            return;
+        }
+
+        const isValidMove = validMoves.some(move =>
+            move.row === row && move.col === col
+        );
+
+        if (isValidMove) {
+            debugLog(`Valid move to: (${row}, ${col})`);
+            const move = {
+                fromRow: selectedPiece.row,
+                fromCol: selectedPiece.col,
+                toRow: row,
+                toCol: col,
+                color: selectedPiece.color
+            };
+
+            sendMove(move);
+        } else {
+            debugLog('Invalid move attempt');
+        }
+
+        selectedPiece = null;
+        validMoves = [];
+    }
+}
+
 
         function calculateValidMoves(row, col, piece) {
             debugLog(`Calculating valid moves for ${piece.color} ${piece.type} at (${row},${col})`);
@@ -425,7 +469,24 @@
             updateTurnIndicator();
             loadBoard();
 
-            
+            // ✅ Bot should move immediately after player if in bot mode
+            if (gameMode === "bot" && currentTurn !== playerSide) {
+                setTimeout(makeBotMove, 500);
+            }
+
+            const status = response.gameStatus;
+
+            if (status?.startsWith("checkmate")) {
+                gameOver = true;
+                const winner = status.includes("white") ? "Black" : "White";
+                alert(`Checkmate! ${winner} wins!`);
+            } else if (status === "stalemate") {
+                gameOver = true;
+                alert("Stalemate! Game ends in a draw.");
+            } else if (status === "draw") {
+                gameOver = true;
+                alert("Game drawn!");
+            }
         } else {
             debugLog('Invalid move: ' + response.message);
             alert(response.message);
@@ -438,40 +499,56 @@
 }
 
 
-       function makeBotMove() {
+
+function makeBotMove() {
     if (gameOver) {
         debugLog("Game over - skipping bot move");
         return;
     }
 
-    debugLog(`Requesting bot move...`);
-
     fetch("/bot-move", {
-        method: "POST"
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: currentTurn })
     })
     .then(res => res.json())
     .then(response => {
-        debugLog("Bot move response:", response);
-
         if (response.success) {
-            currentTurn = response.currentTurn;
+            currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
             updateTurnIndicator();
             loadBoard();
 
-            if (response.gameStatus && response.gameStatus.includes("mate")) {
+            const status = response.gameStatus;
+
+            if (status?.startsWith("checkmate")) {
                 gameOver = true;
-                const winner = response.gameStatus.includes("white") ? "White" : "Black";
-                gameStatus.textContent = `Checkmate! ${winner} wins!`;
+                const winner = status.includes("white") ? "Black" : "White"; // white got checkmated = black wins
                 alert(`Checkmate! ${winner} wins!`);
+            } else if (status === "stalemate") {
+                gameOver = true;
+                alert("Stalemate! Game ends in a draw.");
+            } else if (status === "draw") {
+                gameOver = true;
+                alert("Game drawn!");
             }
+
         } else {
-            alert(response.message);
+            debugLog("Bot move failed: " + response.message);
+
+            if (response.gameStatus?.includes("checkmate") || response.gameStatus === "draw") {
+                gameOver = true;
+                alert(response.message); // backend already set the message
+            } else {
+                alert("Bot move failed: " + response.message);
+            }
         }
     })
     .catch(error => {
-        alert("Error making bot move: " + error.message);
+        debugLog("Error: " + error.message);
+        alert("Error making bot move");
     });
 }
+
 
         function resetGame() {
             debugLog('Resetting game...');
@@ -501,6 +578,25 @@
                 alert('Error resetting game');
             });
         }
+        then(response => {
+    if (response.success) {
+        currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
+        updateTurnIndicator();
+        loadBoard();
+
+        if (response.gameStatus?.includes("checkmate")) {
+            gameOver = true;
+            alert("Checkmate! Game over.");
+        } else if (response.gameStatus === "stalemate" || response.gameStatus === "draw") {
+            gameOver = true;
+            alert("Game ended in a draw.");
+        } else if (gameMode === "bot" && currentTurn !== playerSide) {
+            setTimeout(makeBotMove, 500);
+        }
+    }
+    
+});
+
 
         // Initialize the game
         debugLog('Game initialization complete');
