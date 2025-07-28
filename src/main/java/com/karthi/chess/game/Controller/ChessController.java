@@ -203,5 +203,7 @@ public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, Stri
             return "check-" + (board.getSideToMove() == Side.WHITE ? "white" : "black");
         }
         return "normal";
+
+
     }
 }

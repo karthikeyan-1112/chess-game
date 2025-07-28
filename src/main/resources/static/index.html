@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Master</title>
-    
-
     <style>
         :root {
             --light-square: #f0d9b5;
@@ -14,9 +12,7 @@
             --valid-move: rgba(0, 255, 0, 0.5);
             --capture-move: rgba(255, 0, 0, 0.3);
         }
-        
         body {
-
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #2c3e50;
             color: white;
@@ -26,15 +22,11 @@
             flex-direction: column;
             align-items: center;
         }
-        
-        
-        
         h1 {
             color: #f1c40f;
             text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
             margin-bottom: 5px;
         }
-
         .mode-selector {
     margin-bottom: 15px;
     background: #34495e;
@@ -42,8 +34,6 @@
     border-radius: 8px;
     color: white;
 }
-
-        
         .status {
             background: rgba(0, 0, 0, 0.3);
             padding: 8px 15px;
@@ -51,7 +41,6 @@
             margin-bottom: 20px;
             font-weight: bold;
         }
-        
         .game-container {
             display: flex;
             gap: 30px;
@@ -60,14 +49,12 @@
             justify-content: center;
             flex-wrap: wrap;
         }
-        
         .board-container {
             background: #34495e;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
-        
         .chessboard {
             display: grid;
             grid-template-columns: repeat(8, 60px);
@@ -76,7 +63,6 @@
             width: 480px;
             height: 480px;
         }
-        
         .square {
             width: 60px;
             height: 60px;
@@ -87,13 +73,10 @@
             cursor: pointer;
             position: relative;
         }
-        
         .white { background: var(--light-square); }
         .black { background: var(--dark-square); }
-        
         .white-piece { color: white; text-shadow: 1px 1px 3px #333; }
         .black-piece { color: #222; text-shadow: 1px 1px 2px #777; }
-        
         .selected { background-color: var(--highlight) !important; }
         .valid-move { background-color: var(--valid-move) !important; }
         .capture::before {
@@ -104,7 +87,6 @@
             border-radius: 50%;
             background: var(--capture-move);
         }
-        
         .controls {
             background: #34495e;
             padding: 20px;
@@ -112,17 +94,14 @@
             width: 250px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
-        
         .control-group {
             margin-bottom: 20px;
         }
-        
         h2 {
             color: #f1c40f;
             border-bottom: 2px solid #f1c40f;
             padding-bottom: 5px;
         }
-        
         button {
             background: #f1c40f;
             color: #2c3e50;
@@ -135,12 +114,10 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
         button:hover {
             background: #f39c12;
             transform: translateY(-2px);
         }
-        
         .turn-indicator {
             display: flex;
             align-items: center;
@@ -148,21 +125,17 @@
             gap: 10px;
             margin: 15px 0;
         }
-        
         .turn-circle {
             width: 20px;
             height: 20px;
             border-radius: 50%;
             border: 2px solid #2c3e50;
         }
-        
         .white-turn { background: var(--light-square); }
         .black-turn { background: var(--dark-square); }
-        
         .active-turn {
             box-shadow: 0 0 0 3px #f1c40f;
         }
-        
         .debug-panel {
             background: rgba(0, 0, 0, 0.7);
             padding: 15px;
@@ -174,7 +147,6 @@
             overflow: auto;
             max-height: 200px;
         }
-        
         @media (max-width: 768px) {
             .chessboard {
                 grid-template-columns: repeat(8, 40px);
@@ -182,7 +154,6 @@
                 width: 320px;
                 height: 320px;
             }
-            
             .square {
                 width: 40px;
                 height: 40px;
@@ -206,19 +177,15 @@
     </select>
 </div>
     <div class="status" id="gameStatus">Loading game...</div>
-    
     <div class="game-container">
         <div class="board-container">
             <div class="chessboard" id="chessboard">Loading board...</div>
         </div>
-        
         <div class="controls">
             <div class="control-group">
                 <h2>Game Controls</h2>
                 <button id="resetBtn">Reset Game</button>
-                
             </div>
-            
             <div class="control-group">
                 <h2>Player Turn</h2>
                 <div class="turn-indicator">
@@ -231,15 +198,9 @@
             </div>
         </div>
     </div>
-    
-    <div class="debug-panel" id="debugPanel">
-        Debug information will appear here...
-    </div>
-
     <script>
         let gameMode = "player"; // "player" or "bot"
 let playerSide = "white"; // used in bot mode
-
 // Handle mode and side selection
 document.querySelectorAll('input[name="mode"]').forEach(el => {
     el.addEventListener("change", () => {
@@ -248,31 +209,20 @@ document.querySelectorAll('input[name="mode"]').forEach(el => {
         resetGame();
     });
 });
-
 document.getElementById("sideSelect").addEventListener("change", (e) => {
     playerSide = e.target.value;
     resetGame();
 });
-
         // Add deffuncTug logging
         const debugPanel = document.getElementById('debugPanel');
-        function debugLog(message) {
-            debugPanel.innerHTML += message + '<br>';
-            debugPanel.scrollTop = debugPanel.scrollHeight;
-        }
-        
-        debugLog('Initializing chess game...');
-
         const pieceMap = {
             PAWN: "♟", ROOK: "♜", KNIGHT: "♞", BISHOP: "♝", 
             QUEEN: "♛", KING: "♚"
         };
-
         let selectedPiece = null;
         let validMoves = [];
         let currentTurn = "white";
         let gameOver = false;
-
         // DOM elements
         const gameStatus = document.getElementById('gameStatus');
         const whiteTurn = document.getElementById('whiteTurn');
@@ -280,14 +230,10 @@ document.getElementById("sideSelect").addEventListener("change", (e) => {
         const resetBtn = document.getElementById('resetBtn');
         const botMoveBtn = document.getElementById('botMoveBtn');
         const chessboard = document.getElementById('chessboard');
-
         // Initialize event listeners
         resetBtn.addEventListener('click', resetGame);
         botMoveBtn.addEventListener('click', makeBotMove);
-
         function updateTurnIndicator() {
-            debugLog(`Updating turn indicator to: ${currentTurn}`);
-            
             if (currentTurn === "white") {
                 whiteTurn.classList.add('active-turn');
                 blackTurn.classList.remove('active-turn');
@@ -298,113 +244,96 @@ document.getElementById("sideSelect").addEventListener("change", (e) => {
                 gameStatus.textContent = "Black's Turn";
             }
         }
-
         function loadBoard() {
-            debugLog('Fetching board state from /board...');
-            
             fetch("/board")
                 .then(res => {
-                    debugLog(`Response status: ${res.status}`);
                     if (!res.ok) {
                         throw new Error(`HTTP error! status: ${res.status}`);
                     }
                     return res.json();
                 })
                 .then(data => {
-                    debugLog('Received board data:');
-                    debugLog(JSON.stringify(data, null, 2));
-                    
                     renderBoard(data);
                 })
                 .catch(error => {
-                    debugLog('Error loading board: ' + error.message);
                     chessboard.innerHTML = "Error loading board. See debug panel.";
                 });
         }
-
         function renderBoard(boardData) {
-            debugLog('Rendering board...');
-            
-            // Clear board
-            chessboard.innerHTML = "";
-            
-            // Create board cells
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 8; j++) {
-                    const cell = document.createElement("div");
-                    const isWhite = (i + j) % 2 === 0;
-                    cell.className = `square ${isWhite ? "white" : "black"}`;
-                    
-                    const piece = boardData[i][j];
-                    if (piece) {
-                        const symbol = pieceMap[piece.type] || "?";
-                        cell.textContent = symbol;
-                        cell.classList.add(piece.color.toLowerCase() + "-piece");
-                        
-                        // Show piece type in debug
-                        cell.title = `${piece.color} ${piece.type}`;
-                        
-                        // Add check indicator
-                        if (piece.type === "KING" && piece.inCheck) {
-                            cell.classList.add("in-check");
-                            const checkIndicator = document.createElement("div");
-                            checkIndicator.className = "check-indicator";
-                            cell.appendChild(checkIndicator);
-                        }
-                    } else {
-                        cell.title = `Empty (${i},${j})`;
-                    }
-                    
-                    // Highlight selected piece
-                    if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
-                        cell.classList.add("selected");
-                    }
-                    
-                    // Highlight valid moves
-                    if (validMoves.some(move => move.row === i && move.col === j)) {
-                        cell.classList.add("valid-move");
-                        if (piece) {
-                            cell.classList.add("capture");
-                        }
-                    }
-                    
-                    cell.addEventListener("click", () => handleCellClick(i, j, piece));
-                    chessboard.appendChild(cell);
-                }
+    chessboard.innerHTML = "";
+
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const cell = document.createElement("div");
+            const isWhite = (i + j) % 2 === 0;
+            cell.className = `square ${isWhite ? "white" : "black"}`;
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+
+            const piece = boardData[i][j];
+            if (piece) {
+                const symbol = pieceMap[piece.type] || "?";
+                const pieceElem = document.createElement("span");
+                pieceElem.textContent = symbol;
+                pieceElem.className = piece.color.toLowerCase() + "-piece";
+                pieceElem.setAttribute("draggable", "true");
+
+                // Drag start
+                pieceElem.addEventListener("dragstart", () => {
+                    dragStart = { row: i, col: j, color: piece.color };
+                });
+
+                cell.appendChild(pieceElem);
             }
-            
-            debugLog('Board rendered successfully');
+
+            // Allow drop
+            cell.addEventListener("dragover", (e) => e.preventDefault());
+
+            // Drop logic
+            cell.addEventListener("drop", (e) => {
+                e.preventDefault();
+                if (!dragStart) return;
+
+                const move = {
+                    fromRow: dragStart.row,
+                    fromCol: dragStart.col,
+                    toRow: i,
+                    toCol: j,
+                    color: dragStart.color
+                };
+                sendMove(move);
+                dragStart = null;
+            });
+
+            // Also allow click-based move
+            cell.addEventListener("click", () => handleCellClick(i, j, piece));
+            chessboard.appendChild(cell);
         }
+    }
+}
+
+
 function handleCellClick(row, col, piece) {
     if (gameOver) {
-        debugLog('Game is over. Ignoring click.');
         return;
     }
-
-    debugLog(`Cell clicked: (${row}, ${col}) - ${piece ? piece.type : 'Empty'}`);
-
     if (!selectedPiece) {
         if (piece && piece.color === currentTurn && (gameMode === "player" || playerSide === piece.color))
  {
-            debugLog(`Piece selected: ${piece.color} ${piece.type}`);
             selectedPiece = { row, col, color: piece.color };
             calculateValidMoves(row, col, piece);
         }
     } else {
         if (selectedPiece.row === row && selectedPiece.col === col) {
-            debugLog('Deselecting piece');
             selectedPiece = null;
             validMoves = [];
             loadBoard();
             return;
         }
-
         const isValidMove = validMoves.some(move =>
             move.row === row && move.col === col
         );
-
         if (isValidMove) {
-            debugLog(`Valid move to: (${row}, ${col})`);
             const move = {
                 fromRow: selectedPiece.row,
                 fromCol: selectedPiece.col,
@@ -412,23 +341,15 @@ function handleCellClick(row, col, piece) {
                 toCol: col,
                 color: selectedPiece.color
             };
-
             sendMove(move);
         } else {
-            debugLog('Invalid move attempt');
-        }
-
+            }
         selectedPiece = null;
         validMoves = [];
     }
 }
-
-
         function calculateValidMoves(row, col, piece) {
-            debugLog(`Calculating valid moves for ${piece.color} ${piece.type} at (${row},${col})`);
-            
             validMoves = [];
-            
             fetch("/valid-moves", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -436,25 +357,16 @@ function handleCellClick(row, col, piece) {
             })
             .then(res => res.json())
             .then(data => {
-                debugLog('Valid moves response:');
-                debugLog(JSON.stringify(data));
-                
                 if (data.success && data.validMoves) {
                     validMoves = data.validMoves;
-                    debugLog(`Found ${validMoves.length} valid moves`);
                     loadBoard();
                 } else {
-                    debugLog('Failed to get valid moves: ' + (data.message || 'Unknown error'));
-                }
+                    }
             })
             .catch(error => {
-                debugLog('Error fetching valid moves: ' + error.message);
-            });
+                });
         }
-
         function sendMove(move) {
-    debugLog(`Sending move: ${JSON.stringify(move)}`);
-    
     fetch("/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -462,20 +374,15 @@ function handleCellClick(row, col, piece) {
     })
     .then(res => res.json())
     .then(response => {
-        debugLog('Move response:', response);
-
         if (response.success) {
             currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
             updateTurnIndicator();
             loadBoard();
-
             // ✅ Bot should move immediately after player if in bot mode
             if (gameMode === "bot" && currentTurn !== playerSide) {
                 setTimeout(makeBotMove, 500);
             }
-
             const status = response.gameStatus;
-
             if (status?.startsWith("checkmate")) {
                 gameOver = true;
                 const winner = status.includes("white") ? "Black" : "White";
@@ -488,24 +395,17 @@ function handleCellClick(row, col, piece) {
                 alert("Game drawn!");
             }
         } else {
-            debugLog('Invalid move: ' + response.message);
             alert(response.message);
         }
     })
     .catch(error => {
-        debugLog('Error sending move:', error.message);
         alert('Move failed!');
     });
 }
-
-
-
 function makeBotMove() {
     if (gameOver) {
-        debugLog("Game over - skipping bot move");
         return;
     }
-
     fetch("/bot-move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -517,9 +417,7 @@ function makeBotMove() {
             currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
             updateTurnIndicator();
             loadBoard();
-
             const status = response.gameStatus;
-
             if (status?.startsWith("checkmate")) {
                 gameOver = true;
                 const winner = status.includes("white") ? "Black" : "White"; // white got checkmated = black wins
@@ -531,10 +429,7 @@ function makeBotMove() {
                 gameOver = true;
                 alert("Game drawn!");
             }
-
         } else {
-            debugLog("Bot move failed: " + response.message);
-
             if (response.gameStatus?.includes("checkmate") || response.gameStatus === "draw") {
                 gameOver = true;
                 alert(response.message); // backend already set the message
@@ -544,23 +439,15 @@ function makeBotMove() {
         }
     })
     .catch(error => {
-        debugLog("Error: " + error.message);
         alert("Error making bot move");
     });
 }
-
-
         function resetGame() {
-            debugLog('Resetting game...');
-            
             fetch("/reset", {
                 method: "POST"
             })
             .then(res => res.json())
             .then(response => {
-                debugLog('Reset response:');
-                debugLog(JSON.stringify(response));
-                
                 if (response.success) {
                     selectedPiece = null;
                     validMoves = [];
@@ -569,12 +456,10 @@ function makeBotMove() {
                     updateTurnIndicator();
                     loadBoard();
                 } else {
-                    debugLog('Reset failed: ' + response.message);
                     alert('Reset failed: ' + response.message);
                 }
             })
             .catch(error => {
-                debugLog('Error resetting game: ' + error.message);
                 alert('Error resetting game');
             });
         }
@@ -583,7 +468,6 @@ function makeBotMove() {
         currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
         updateTurnIndicator();
         loadBoard();
-
         if (response.gameStatus?.includes("checkmate")) {
             gameOver = true;
             alert("Checkmate! Game over.");
@@ -594,12 +478,8 @@ function makeBotMove() {
             setTimeout(makeBotMove, 500);
         }
     }
-    
 });
-
-
         // Initialize the game
-        debugLog('Game initialization complete');
         updateTurnIndicator();
         loadBoard();
     </script>
