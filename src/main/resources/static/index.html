@@ -259,7 +259,7 @@ document.getElementById("sideSelect").addEventListener("change", (e) => {
                     chessboard.innerHTML = "Error loading board. See debug panel.";
                 });
         }
-        function renderBoard(boardData) {
+       function renderBoard(boardData) {
     chessboard.innerHTML = "";
 
     for (let i = 0; i < 8; i++) {
@@ -271,42 +271,87 @@ document.getElementById("sideSelect").addEventListener("change", (e) => {
             cell.dataset.col = j;
 
             const piece = boardData[i][j];
+
             if (piece) {
                 const symbol = pieceMap[piece.type] || "?";
                 const pieceElem = document.createElement("span");
                 pieceElem.textContent = symbol;
                 pieceElem.className = piece.color.toLowerCase() + "-piece";
-                pieceElem.setAttribute("draggable", "true");
+                pieceElem.setAttribute("draggable", true);
 
-                // Drag start
-                pieceElem.addEventListener("dragstart", () => {
-                    dragStart = { row: i, col: j, color: piece.color };
+                // ✅ Drag Start
+                pieceElem.addEventListener("dragstart", (e) => {
+                    selectedPiece = { row: i, col: j, color: piece.color };
+
+                    // Send valid move request
+                    fetch("/valid-moves", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ row: i, col: j })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        validMoves = data.validMoves || [];
+                    });
+
+                    e.dataTransfer.setData("fromRow", i);
+                    e.dataTransfer.setData("fromCol", j);
                 });
 
                 cell.appendChild(pieceElem);
             }
 
-            // Allow drop
+            // ✅ Allow drop
             cell.addEventListener("dragover", (e) => e.preventDefault());
 
-            // Drop logic
+            // ✅ Drop logic with validation and promotion
             cell.addEventListener("drop", (e) => {
                 e.preventDefault();
-                if (!dragStart) return;
+                const fromRow = parseInt(e.dataTransfer.getData("fromRow"));
+                const fromCol = parseInt(e.dataTransfer.getData("fromCol"));
+                const toRow = i;
+                const toCol = j;
+
+                const fromPiece = boardData[fromRow][fromCol];
+                if (!fromPiece) return;
+
+                const isValid = validMoves.some(m => m.row === toRow && m.col === toCol);
+                if (!isValid) {
+                    alert("Invalid move");
+                    return;
+                }
 
                 const move = {
-                    fromRow: dragStart.row,
-                    fromCol: dragStart.col,
-                    toRow: i,
-                    toCol: j,
-                    color: dragStart.color
+                    fromRow, fromCol, toRow, toCol,
+                    color: fromPiece.color
                 };
+
+                const isPromotion = fromPiece.type === "PAWN" && (toRow === 0 || toRow === 7);
+                if (isPromotion) {
+                    const promotion = prompt("Promote to? (queen, rook, bishop, knight)", "queen");
+                    if (!promotion || !["queen", "rook", "bishop", "knight"].includes(promotion.toLowerCase())) {
+                        alert("Invalid promotion piece");
+                        return;
+                    }
+                    move.promotion = promotion.toLowerCase();
+                }
+
                 sendMove(move);
-                dragStart = null;
             });
 
-            // Also allow click-based move
+            // ✅ Highlighting and click support
+            if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
+                cell.classList.add("selected");
+            }
+
+            if (validMoves.some(m => m.row === i && m.col === j)) {
+                cell.classList.add("valid-move");
+                if (piece) cell.classList.add("capture");
+            }
+
+            // ✅ Click-to-move support
             cell.addEventListener("click", () => handleCellClick(i, j, piece));
+
             chessboard.appendChild(cell);
         }
     }

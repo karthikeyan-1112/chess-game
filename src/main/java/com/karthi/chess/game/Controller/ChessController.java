@@ -57,43 +57,66 @@ public class ChessController implements InitializingBean {
         return ResponseEntity.ok(boardState);
     }
 
-    @PostMapping("/move")
-    public ResponseEntity<Map<String, Object>> move(@RequestBody Map<String, Object> moveData) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            int fromRow = (int) moveData.get("fromRow");
-            int fromCol = (int) moveData.get("fromCol");
-            int toRow = (int) moveData.get("toRow");
-            int toCol = (int) moveData.get("toCol");
-            String color = moveData.get("color").toString().toLowerCase();
-            Side playerSide = color.equals("white") ? Side.WHITE : Side.BLACK;
+   @PostMapping("/move")
+public ResponseEntity<Map<String, Object>> move(@RequestBody Map<String, Object> moveData) {
+    Map<String, Object> response = new HashMap<>();
+    try {
+        int fromRow = (int) moveData.get("fromRow");
+        int fromCol = (int) moveData.get("fromCol");
+        int toRow = (int) moveData.get("toRow");
+        int toCol = (int) moveData.get("toCol");
+        String color = moveData.get("color").toString().toLowerCase();
+        Side playerSide = color.equals("white") ? Side.WHITE : Side.BLACK;
 
-            if (board.getSideToMove() != playerSide) {
+        if (board.getSideToMove() != playerSide) {
+            response.put("success", false);
+            response.put("message", "Not " + color + "'s turn!");
+            return ResponseEntity.ok(response);
+        }
+
+        Square from = Square.valueOf(String.format("%s%d", (char) ('a' + fromCol), 8 - fromRow).toUpperCase());
+        Square to = Square.valueOf(String.format("%s%d", (char) ('a' + toCol), 8 - toRow).toUpperCase());
+
+        Move move;
+
+        // ✅ Handle promotion
+        if (moveData.containsKey("promotion")) {
+            String promotionStr = moveData.get("promotion").toString().toUpperCase(); // e.g., "QUEEN"
+            String pieceName = (playerSide == Side.WHITE ? "WHITE_" : "BLACK_") + promotionStr;
+
+            try {
+                Piece promotedPiece = Piece.valueOf(pieceName);
+                move = new Move(from, to, promotedPiece); // 🧠 use correct constructor
+            } catch (IllegalArgumentException e) {
                 response.put("success", false);
-                response.put("message", "Not " + color + "'s turn!");
+                response.put("message", "Invalid promotion piece: " + promotionStr);
                 return ResponseEntity.ok(response);
             }
-
-            Square from = Square.valueOf(String.format("%s%d", (char)('a' + fromCol), 8 - fromRow).toUpperCase());
-            Square to = Square.valueOf(String.format("%s%d", (char)('a' + toCol), 8 - toRow).toUpperCase());
-            Move move = new Move(from, to);
-
-            if (board.isMoveLegal(move, true)) {
-                board.doMove(move);
-                response.put("success", true);
-                response.put("move", move.toString());
-                response.put("gameStatus", getCurrentGameStatus());
-            } else {
-                response.put("success", false);
-                response.put("message", "Invalid move");
-            }
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Error: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+        } else {
+            move = new Move(from, to); // normal move
         }
+
+        // ✅ Check legality and apply move
+        if (board.isMoveLegal(move, true)) {
+            board.doMove(move);
+            response.put("success", true);
+            response.put("move", move.toString());
+            response.put("currentTurn", board.getSideToMove() == Side.WHITE ? "white" : "black");
+            response.put("gameStatus", getCurrentGameStatus());
+        } else {
+            response.put("success", false);
+            response.put("message", "Invalid move");
+        }
+
+        return ResponseEntity.ok(response);
+
+    } catch (Exception e) {
+        response.put("success", false);
+        response.put("message", "Error: " + e.getMessage());
+        return ResponseEntity.internalServerError().body(response);
     }
+}
+
 
    @PostMapping("/bot-move")
 public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
