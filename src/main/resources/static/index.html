@@ -1,532 +1,612 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
     <title>Chess Master</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         :root {
             --light-square: #f0d9b5;
             --dark-square: #b58863;
-            --highlight: rgba(0, 200, 255, 0.5);
-            --valid-move: rgba(0, 255, 0, 0.5);
-            --capture-move: rgba(255, 0, 0, 0.3);
+            --highlight: #26c6da77;
+            --valid-move: #81c78488;
+            --last-move: #fffde76b;
+            --capture-move: #e5737366;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #2c3e50;
-            color: white;
             margin: 0;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #242933;
+            color: #ffe;
+            min-height: 100vh;
+        }
+        .container {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        h1 {
-            color: #f1c40f;
-            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
-            margin-bottom: 5px;
-        }
-        .mode-selector {
-    margin-bottom: 15px;
-    background: #34495e;
-    padding: 10px 15px;
-    border-radius: 8px;
-    color: white;
-}
-        .status {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 15px;
-            border-radius: 20px;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-        .game-container {
-            display: flex;
-            gap: 30px;
-            max-width: 1000px;
-            width: 100%;
+            flex-direction: row;
+            gap: 36px;
             justify-content: center;
-            flex-wrap: wrap;
+            margin-top: 24px;
         }
-        .board-container {
-            background: #34495e;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
+        .board-panel { }
         .chessboard {
             display: grid;
-            grid-template-columns: repeat(8, 60px);
-            grid-template-rows: repeat(8, 60px);
-            border: 2px solid #2c3e50;
-            width: 480px;
-            height: 480px;
+            grid-template-columns: repeat(8, 56px);
+            grid-template-rows: repeat(8, 56px);
+            border: 2px solid #181c20;
+            border-radius: 10px;
+            box-shadow: 0 6px 32px #0008;
+            background: #181c20;
         }
         .square {
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            cursor: pointer;
+            font-size: 2.5em;
             position: relative;
+            cursor: pointer;
+            user-select: none;
         }
         .white { background: var(--light-square); }
         .black { background: var(--dark-square); }
-        .white-piece { color: white; text-shadow: 1px 1px 3px #333; }
-        .black-piece { color: #222; text-shadow: 1px 1px 2px #777; }
-        .selected { background-color: var(--highlight) !important; }
-        .valid-move { background-color: var(--valid-move) !important; }
+        .selected { box-shadow: 0 0 0 4px var(--highlight) inset; }
+        .valid-move { box-shadow: 0 0 0 4px var(--valid-move) inset; }
+        .last-move { background: var(--last-move) !important; }
         .capture::before {
             content: "";
             position: absolute;
-            width: 100%;
-            height: 100%;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
             border-radius: 50%;
             background: var(--capture-move);
+            z-index: 1;
         }
-        .controls {
-            background: #34495e;
-            padding: 20px;
+        .piece {
+            z-index: 2;
+        }
+        .white-piece {
+            color: #fff !important;
+            text-shadow: 0 2px 4px #adadad22, 0 0 1px #9997;
+        }
+        .black-piece {
+            color: #000 !important;
+            text-shadow: 0 2px 4px #0006, 0 0 1px #3337;
+        }
+        .ui-panel {
+            background: #181c20cc;
             border-radius: 10px;
-            width: 250px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 18px #0007;
+            padding: 18px 14px;
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
         }
-        .control-group {
-            margin-bottom: 20px;
-        }
-        h2 {
-            color: #f1c40f;
-            border-bottom: 2px solid #f1c40f;
-            padding-bottom: 5px;
+        /* Buttons stacked vertically */
+        .major-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
         }
         button {
-            background: #f1c40f;
-            color: #2c3e50;
+            padding: 9px 0;
+            font-size: 1em;
             border: none;
-            padding: 10px 15px;
-            margin: 5px 0;
-            width: 100%;
-            border-radius: 5px;
+            background: #f1c40f;
+            color: #222;
             font-weight: bold;
+            border-radius: 5px;
+            margin: 4px 0;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.18s, color 0.18s;
         }
         button:hover {
             background: #f39c12;
-            transform: translateY(-2px);
+            color: #fff;
         }
-        .turn-indicator {
+        #undoBtn:disabled {
+            background: #b9b9b9;
+            color: #777;
+            cursor: not-allowed;
+        }
+        .move-history {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 1em;
+            background: #242933;
+            color: #fff;
+            border-radius: 5px;
+            max-width: 95vw;
+            white-space: nowrap; /* Prevents wrapping */
+            overflow-x: auto; /* Enables horizontal scroll */
+            overflow-y: hidden;
+            padding: 5px;
+            margin-bottom: 12px;
+        }
+        .status-bar {
+            background: #283544;
+            padding: 8px 0;
+            margin-bottom: 10px;
+            font-weight: bold;
+            border-radius: 7px;
+            text-align: center;
+            color: #fff176;
+            font-size: 1.1em;
+            min-height: 28px;
+        }
+        .select-promotion {
             display: flex;
+            gap: 12px;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            margin: 15px 0;
+            margin: 16px 0;
         }
-        .turn-circle {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid #2c3e50;
+        .promotion-btn {
+            font-size: 1.2em;
+            background: #fff176dd;
+            color: #181c20;
+            padding: 8px 14px;
         }
-        .white-turn { background: var(--light-square); }
-        .black-turn { background: var(--dark-square); }
-        .active-turn {
-            box-shadow: 0 0 0 3px #f1c40f;
+        /* Mode selection buttons */
+        .mode-select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            margin-bottom: 12px;
         }
-        .debug-panel {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
+        .mode-btn {
+            background: #546e7a;
+            color: #fff;
+            border-radius: 6px;
+            border: none;
+            font-size: 1em;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: background 0.18s, color 0.18s;
+            font-weight: bold;
+        }
+        .mode-btn.active,
+        .mode-btn:active {
+            background: #f1c40f;
+            color: #222;
+        }
+        .confirm-btn {
+            font-weight: bold;
+            background: #06d69e;
+            color: #142;
+            border-radius: 6px;
+            margin-top: 2px;
+        }
+        #sideSelect {
+            margin: 0 0;
+            padding: 7px 4px;
             border-radius: 5px;
-            margin-top: 20px;
-            width: 100%;
-            max-width: 800px;
-            font-family: monospace;
-            overflow: auto;
-            max-height: 200px;
+            border: 1px solid #ccc;
+            width: 70%;
+            align-self: flex-start;
         }
-        @media (max-width: 768px) {
+        /* Responsive adjustments */
+        @media (max-width: 850px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .ui-panel {
+                width: 99vw;
+                max-width: 350px;
+            }
             .chessboard {
-                grid-template-columns: repeat(8, 40px);
-                grid-template-rows: repeat(8, 40px);
-                width: 320px;
-                height: 320px;
+                grid-template-columns: repeat(8, 8vw);
+                grid-template-rows: repeat(8, 8vw);
+                max-width: 96vw;
             }
             .square {
-                width: 40px;
-                height: 40px;
-                font-size: 30px;
+                font-size: 6vw;
             }
         }
     </style>
 </head>
 <body>
-    <h1>Chess Master</h1>
-    <div class="mode-selector">
-    <label>
-        <input type="radio" name="mode" value="player" checked> Player vs Player
-    </label>
-    <label>
-        <input type="radio" name="mode" value="bot"> Player vs Bot
-    </label>
-    <select id="sideSelect">
-        <option value="white" selected>You play White</option>
-        <option value="black">You play Black</option>
-    </select>
-</div>
-    <div class="status" id="gameStatus">Loading game...</div>
-    <div class="game-container">
-        <div class="board-container">
-            <div class="chessboard" id="chessboard">Loading board...</div>
+    <h1 style="text-align:center;letter-spacing:1px;margin:14px 0 3px 0;">♛ Chess Master</h1>
+    <div class="status-bar" id="statusBar">Select mode and click Confirm to start the game.</div>
+    <div class="container">
+        <div class="board-panel">
+            <div id="chessboard" class="chessboard"></div>
         </div>
-        <div class="controls">
-            <div class="control-group">
-                <h2>Game Controls</h2>
-                <button id="resetBtn">Reset Game</button>
+        <div class="ui-panel">
+            <div class="major-btn-group">
+                <button id="resetBtn">⟳ Reset</button>
+                <button id="undoBtn" disabled>↶ Undo</button>
             </div>
-            <div class="control-group">
-                <h2>Player Turn</h2>
-                <div class="turn-indicator">
-                    <div class="turn-circle white-turn" id="whiteTurn"></div>
-                    <span>White</span>
-                    <div class="turn-circle black-turn" id="blackTurn"></div>
-                    <span>Black</span>
-                </div>
-                <button id="botMoveBtn">Make Bot Move</button>
+            <!-- Mode selection group -->
+            <div id="modeSelectGroup" class="mode-select-group">
+                <button id="pvpBtn" class="mode-btn active">Player vs Player</button>
+                <button id="pvbBtn" class="mode-btn">Player vs Bot</button>
+                <select id="sideSelect" style="display:none;">
+                    <option value="white">You play White</option>
+                    <option value="black">You play Black</option>
+                </select>
+                <button id="confirmModeBtn" class="confirm-btn">Confirm</button>
+            </div>
+            <div>
+                <div style="margin-bottom:5px;font-weight:600;">Move History</div>
+                <div id="moveHistory" class="move-history"></div>
+            </div>
+            <button id="botMoveBtn" style="display:none;">Make Bot Move</button>
+        </div>
+    </div>
+    <div id="promotionPopup" style="display: none; position: fixed; top:0; left:0; width:100vw; height:100vh; align-items:center; justify-content:center; background:rgba(20,20,30,0.70); z-index:20;">
+        <div style="background:#444; border-radius:15px; padding:26px 32px; text-align:center; color:var(--light-square);">
+            <div style="font-size:1.3em; margin-bottom:1em;">Choose Promotion</div>
+            <div class="select-promotion">
+                <button class="promotion-btn" data-piece="queen">♛</button>
+                <button class="promotion-btn" data-piece="rook">♜</button>
+                <button class="promotion-btn" data-piece="bishop">♝</button>
+                <button class="promotion-btn" data-piece="knight">♞</button>
             </div>
         </div>
     </div>
     <script>
-        let gameMode = "player"; // "player" or "bot"
-let playerSide = "white"; // used in bot mode
-// Handle mode and side selection
-document.querySelectorAll('input[name="mode"]').forEach(el => {
-    el.addEventListener("change", () => {
-        gameMode = el.value;
-        document.getElementById("sideSelect").style.display = gameMode === "bot" ? "inline-block" : "none";
-        resetGame();
-    });
-});
-document.getElementById("sideSelect").addEventListener("change", (e) => {
-    playerSide = e.target.value;
-    resetGame();
-});
-        // Add deffuncTug logging
-        const debugPanel = document.getElementById('debugPanel');
-        const pieceMap = {
-            PAWN: "♟", ROOK: "♜", KNIGHT: "♞", BISHOP: "♝", 
-            QUEEN: "♛", KING: "♚"
+        // DOM references
+        const modeSelectGroup = document.getElementById('modeSelectGroup');
+        const pvpBtn = document.getElementById('pvpBtn');
+        const pvbBtn = document.getElementById('pvbBtn');
+        const confirmModeBtn = document.getElementById('confirmModeBtn');
+        const sideSelect = document.getElementById('sideSelect');
+        const undoBtn = document.getElementById('undoBtn');
+        const botMoveBtn = document.getElementById('botMoveBtn');
+        const statusBar = document.getElementById('statusBar');
+        const historyPanel = document.getElementById('moveHistory');
+        const chessboard = document.getElementById('chessboard');
+        const promotionPopup = document.getElementById('promotionPopup');
+
+        const pieceUnicode = {
+            PAWN:   { white: "♙", black: "♟" },
+            ROOK:   { white: "♖", black: "♜" },
+            KNIGHT: { white: "♘", black: "♞" },
+            BISHOP: { white: "♗", black: "♝" },
+            QUEEN:  { white: "♕", black: "♛" },
+            KING:   { white: "♔", black: "♚" }
         };
+        let gameMode = 'player';       // 'player' or 'bot'
+        let playerSide = 'white';      // if vs bot
+        let modeSelectionConfirmed = false;
+        let currentTurn = "white";
         let selectedPiece = null;
         let validMoves = [];
-        let currentTurn = "white";
+        let lastMove = null;
+        let moveHistory = [];
+        let _latestBoardState = null;
         let gameOver = false;
-        // DOM elements
-        const gameStatus = document.getElementById('gameStatus');
-        const whiteTurn = document.getElementById('whiteTurn');
-        const blackTurn = document.getElementById('blackTurn');
-        const resetBtn = document.getElementById('resetBtn');
-        const botMoveBtn = document.getElementById('botMoveBtn');
-        const chessboard = document.getElementById('chessboard');
-        // Initialize event listeners
-        resetBtn.addEventListener('click', resetGame);
-        botMoveBtn.addEventListener('click', makeBotMove);
-        function updateTurnIndicator() {
-            if (currentTurn === "white") {
-                whiteTurn.classList.add('active-turn');
-                blackTurn.classList.remove('active-turn');
-                gameStatus.textContent = "White's Turn";
-            } else {
-                blackTurn.classList.add('active-turn');
-                whiteTurn.classList.remove('active-turn');
-                gameStatus.textContent = "Black's Turn";
+        let gameStarted = false;
+        let promotionMove = null;
+
+        function updateModeButtons() {
+            pvpBtn.classList.toggle('active', gameMode === 'player');
+            pvbBtn.classList.toggle('active', gameMode === 'bot');
+            sideSelect.style.display = (gameMode === 'bot') ? 'block' : 'none';
+        }
+        pvpBtn.onclick = () => {
+            gameMode = 'player';
+            updateModeButtons();
+        };
+        pvbBtn.onclick = () => {
+            gameMode = 'bot';
+            updateModeButtons();
+        };
+        sideSelect.onchange = () => {
+            playerSide = sideSelect.value;
+        };
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+        confirmModeBtn.onclick = () => {
+            modeSelectionConfirmed = true;
+            modeSelectGroup.style.display = 'none';
+
+            resetGame().then(success => {
+                if (!success) return;
+
+                gameOver = false;
+                gameStarted = true;
+
+                updateStatusBar(capitalize(currentTurn) + "'s turn");
+                loadBoard();
+
+                undoBtn.disabled = true;
+
+                if (gameMode === 'bot') {
+                    botMoveBtn.style.display = "inline-block";
+                    sideSelect.style.display = "block";
+
+                    if (playerSide === 'black') {
+                        makeBotMove();
+                    }
+                } else {
+                    botMoveBtn.style.display = "none";
+                    sideSelect.style.display = "none";
+                }
+            });
+        };
+        function updateStatusBar(msg) {
+            statusBar.innerHTML = msg || "";
+        }
+        function updateMoveHistory() {
+            let html = '';
+            for (let i = 0; i < moveHistory.length; i += 2) {
+                let n = (i / 2) + 1,
+                    white = moveHistory[i] || '',
+                    black = moveHistory[i + 1] || '';
+                html += `${n}. ${white} ${black} `;
+            }
+            historyPanel.innerHTML = html.trim();
+            undoBtn.disabled = (!moveHistory.length || !gameStarted);
+        }
+        function boardStateAt(row, col) {
+            return _latestBoardState?.[row]?.[col];
+        }
+        function renderBoard(boardData) {
+            chessboard.innerHTML = '';
+            for (let i = 0; i < 8; ++i) {
+                for (let j = 0; j < 8; ++j) {
+                    const sq = document.createElement('div');
+                    const isWhite = (i + j) % 2 === 0;
+                    const data = boardData[i][j];
+                    sq.className = 'square ' + (isWhite ? 'white' : 'black');
+                    sq.dataset.row = i;
+                    sq.dataset.col = j;
+                    if (lastMove && ((i === lastMove.fromRow && j === lastMove.fromCol) || (i === lastMove.toRow && j === lastMove.toCol))) {
+                        sq.classList.add('last-move');
+                    }
+                    if (data) {
+                        const sym = pieceUnicode[data.type]?.[data.color] || "?";
+                        const pspan = document.createElement("span");
+                        pspan.className = "piece " + (data.color === "white" ? "white-piece" : "black-piece");
+                        pspan.textContent = sym;
+                        pspan.setAttribute("draggable", !gameOver && gameStarted);
+                        sq.appendChild(pspan);
+                    }
+                    if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
+                        sq.classList.add("selected");
+                    }
+                    if (validMoves.some(m => m.row === i && m.col === j)) {
+                        sq.classList.add("valid-move");
+                        if (data) sq.classList.add("capture");
+                    }
+                    sq.addEventListener("click", () => handleSquareClick(i, j, data));
+                    sq.addEventListener("dragover", e => e.preventDefault());
+                    sq.addEventListener("drop", e => handleDrop(i, j));
+                    chessboard.appendChild(sq);
+                }
             }
         }
         function loadBoard() {
-            fetch("/board")
-                .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
-                    return res.json();
-                })
+            fetch('/board')
+                .then(resp => resp.json())
                 .then(data => {
+                    _latestBoardState = data;
                     renderBoard(data);
-                })
-                .catch(error => {
-                    chessboard.innerHTML = "Error loading board. See debug panel.";
                 });
         }
-       function renderBoard(boardData) {
-    chessboard.innerHTML = "";
-
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            const cell = document.createElement("div");
-            const isWhite = (i + j) % 2 === 0;
-            cell.className = `square ${isWhite ? "white" : "black"}`;
-            cell.dataset.row = i;
-            cell.dataset.col = j;
-
-            const piece = boardData[i][j];
-
-            if (piece) {
-                const symbol = pieceMap[piece.type] || "?";
-                const pieceElem = document.createElement("span");
-                pieceElem.textContent = symbol;
-                pieceElem.className = piece.color.toLowerCase() + "-piece";
-                pieceElem.setAttribute("draggable", true);
-
-                // ✅ Drag Start
-                pieceElem.addEventListener("dragstart", (e) => {
-                    selectedPiece = { row: i, col: j, color: piece.color };
-
-                    // Send valid move request
-                    fetch("/valid-moves", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ row: i, col: j })
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        validMoves = data.validMoves || [];
-                    });
-
-                    e.dataTransfer.setData("fromRow", i);
-                    e.dataTransfer.setData("fromCol", j);
-                });
-
-                cell.appendChild(pieceElem);
-            }
-
-            // ✅ Allow drop
-            cell.addEventListener("dragover", (e) => e.preventDefault());
-
-            // ✅ Drop logic with validation and promotion
-            cell.addEventListener("drop", (e) => {
-                e.preventDefault();
-                const fromRow = parseInt(e.dataTransfer.getData("fromRow"));
-                const fromCol = parseInt(e.dataTransfer.getData("fromCol"));
-                const toRow = i;
-                const toCol = j;
-
-                const fromPiece = boardData[fromRow][fromCol];
-                if (!fromPiece) return;
-
-                const isValid = validMoves.some(m => m.row === toRow && m.col === toCol);
-                if (!isValid) {
-                    alert("Invalid move");
-                    return;
-                }
-
-                const move = {
-                    fromRow, fromCol, toRow, toCol,
-                    color: fromPiece.color
-                };
-
-                const isPromotion = fromPiece.type === "PAWN" && (toRow === 0 || toRow === 7);
-                if (isPromotion) {
-                    const promotion = prompt("Promote to? (queen, rook, bishop, knight)", "queen");
-                    if (!promotion || !["queen", "rook", "bishop", "knight"].includes(promotion.toLowerCase())) {
-                        alert("Invalid promotion piece");
-                        return;
-                    }
-                    move.promotion = promotion.toLowerCase();
-                }
-
-                sendMove(move);
-            });
-
-            // ✅ Highlighting and click support
-            if (selectedPiece && selectedPiece.row === i && selectedPiece.col === j) {
-                cell.classList.add("selected");
-            }
-
-            if (validMoves.some(m => m.row === i && m.col === j)) {
-                cell.classList.add("valid-move");
-                if (piece) cell.classList.add("capture");
-            }
-
-            // ✅ Click-to-move support
-            cell.addEventListener("click", () => handleCellClick(i, j, piece));
-
-            chessboard.appendChild(cell);
-        }
-    }
-}
-
-
-function handleCellClick(row, col, piece) {
-    if (gameOver) {
-        return;
-    }
-    if (!selectedPiece) {
-        if (piece && piece.color === currentTurn && (gameMode === "player" || playerSide === piece.color))
- {
-            selectedPiece = { row, col, color: piece.color };
-            calculateValidMoves(row, col, piece);
-        }
-    } else {
-        if (selectedPiece.row === row && selectedPiece.col === col) {
-            selectedPiece = null;
-            validMoves = [];
-            loadBoard();
-            return;
-        }
-        const isValidMove = validMoves.some(move =>
-            move.row === row && move.col === col
-        );
-        if (isValidMove) {
-            const move = {
-                fromRow: selectedPiece.row,
-                fromCol: selectedPiece.col,
-                toRow: row,
-                toCol: col,
-                color: selectedPiece.color
-            };
-            sendMove(move);
-        } else {
-            }
-        selectedPiece = null;
-        validMoves = [];
-    }
-}
-        function calculateValidMoves(row, col, piece) {
-            validMoves = [];
-            fetch("/valid-moves", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+        function fetchValidMoves(row, col) {
+            fetch('/valid-moves', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ row, col })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.validMoves) {
-                    validMoves = data.validMoves;
-                    loadBoard();
-                } else {
+            }).then(d => d.json())
+                .then(res => {
+                    if (res.success) {
+                        validMoves = res.validMoves;
+                        loadBoard();
                     }
-            })
-            .catch(error => {
                 });
         }
         function sendMove(move) {
-    fetch("/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(move)
-    })
-    .then(res => res.json())
-    .then(response => {
-        if (response.success) {
-            currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
-            updateTurnIndicator();
-            loadBoard();
-            // ✅ Bot should move immediately after player if in bot mode
-            if (gameMode === "bot" && currentTurn !== playerSide) {
-                setTimeout(makeBotMove, 500);
-            }
-            const status = response.gameStatus;
-            if (status?.startsWith("checkmate")) {
-                gameOver = true;
-                const winner = status.includes("white") ? "Black" : "White";
-                alert(`Checkmate! ${winner} wins!`);
-            } else if (status === "stalemate") {
-                gameOver = true;
-                alert("Stalemate! Game ends in a draw.");
-            } else if (status === "draw") {
-                gameOver = true;
-                alert("Game drawn!");
-            }
-        } else {
-            alert(response.message);
+            hidePromotion();
+            fetch('/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(move)
+            }).then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        currentTurn = res.currentTurn;
+                        lastMove = {
+                            fromRow: move.fromRow,
+                            fromCol: move.fromCol,
+                            toRow: move.toRow,
+                            toCol: move.toCol
+                        };
+                        selectedPiece = null;
+                        validMoves = [];
+                        moveHistory = res.moveHistory || moveHistory;
+                        _latestBoardState = null;
+                        updateMoveHistory();
+                        handleGameStatus(res.gameStatus);
+                        loadBoard();
+                        if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
+                            setTimeout(makeBotMove, 550);
+                        }
+                    } else {
+                        alert(res.message);
+                    }
+                }).catch(() => alert("Move error!"));
         }
-    })
-    .catch(error => {
-        alert('Move failed!');
-    });
-}
-function makeBotMove() {
-    if (gameOver) {
-        return;
-    }
-    fetch("/bot-move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ color: currentTurn })
-    })
-    .then(res => res.json())
-    .then(response => {
-        if (response.success) {
-            currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
-            updateTurnIndicator();
-            loadBoard();
-            const status = response.gameStatus;
-            if (status?.startsWith("checkmate")) {
-                gameOver = true;
-                const winner = status.includes("white") ? "Black" : "White"; // white got checkmated = black wins
-                alert(`Checkmate! ${winner} wins!`);
-            } else if (status === "stalemate") {
-                gameOver = true;
-                alert("Stalemate! Game ends in a draw.");
-            } else if (status === "draw") {
-                gameOver = true;
-                alert("Game drawn!");
-            }
-        } else {
-            if (response.gameStatus?.includes("checkmate") || response.gameStatus === "draw") {
-                gameOver = true;
-                alert(response.message); // backend already set the message
+        function makeBotMove() {
+            if (gameOver) return;
+            fetch('/bot-move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ color: currentTurn })
+            }).then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        lastMove = parseMoveString(res.move);
+                        currentTurn = res.currentTurn;
+                        moveHistory = res.moveHistory || moveHistory;
+                        updateMoveHistory();
+                        handleGameStatus(res.gameStatus);
+                        loadBoard();
+                    } else {
+                        alert(res.message);
+                    }
+                });
+        }
+        function parseMoveString(s) {
+            if (!s || s.length < 4) return null;
+            let fc = s.charCodeAt(0) - 97,
+                fr = 8 - (+s[1]),
+                tc = s.charCodeAt(2) - 97,
+                tr = 8 - (+s[3]);
+            return { fromRow: fr, fromCol: fc, toRow: tr, toCol: tc };
+        }
+        function handleSquareClick(row, col, piece) {
+            if (!gameStarted || gameOver) return;
+            if (!selectedPiece) {
+                if (!piece) return;
+                if (gameMode === "bot" && piece.color !== playerSide) return;
+                if (piece.color !== currentTurn) return;
+                selectedPiece = { row, col, color: piece.color };
+                fetchValidMoves(row, col);
             } else {
-                alert("Bot move failed: " + response.message);
-            }
-        }
-    })
-    .catch(error => {
-        alert("Error making bot move");
-    });
-}
-        function resetGame() {
-            fetch("/reset", {
-                method: "POST"
-            })
-            .then(res => res.json())
-            .then(response => {
-                if (response.success) {
+                if (selectedPiece.row === row && selectedPiece.col === col) {
                     selectedPiece = null;
                     validMoves = [];
-                    currentTurn = "white";
-                    gameOver = false;
-                    updateTurnIndicator();
                     loadBoard();
-                } else {
-                    alert('Reset failed: ' + response.message);
+                    return;
                 }
-            })
-            .catch(error => {
-                alert('Error resetting game');
-            });
+                let isValid = validMoves.some(m => m.row === row && m.col === col);
+                if (isValid) {
+                    const from = selectedPiece;
+                    let move = {
+                        fromRow: from.row,
+                        fromCol: from.col,
+                        toRow: row,
+                        toCol: col,
+                        color: selectedPiece.color
+                    };
+                    const isPromotion = pieceUnicode.PAWN && (from.color === "white" && row === 0 || from.color === "black" && row === 7)
+                        && boardStateAt(from.row, from.col)?.type === "PAWN";
+                    if (isPromotion) {
+                        showPromotion(move);
+                        return;
+                    }
+                    sendMove(move);
+                } else {
+                    selectedPiece = null;
+                    validMoves = [];
+                    loadBoard();
+                }
+            }
         }
-        then(response => {
-    if (response.success) {
-        currentTurn = response.currentTurn || (currentTurn === "white" ? "black" : "white");
-        updateTurnIndicator();
-        loadBoard();
-        if (response.gameStatus?.includes("checkmate")) {
-            gameOver = true;
-            alert("Checkmate! Game over.");
-        } else if (response.gameStatus === "stalemate" || response.gameStatus === "draw") {
-            gameOver = true;
-            alert("Game ended in a draw.");
-        } else if (gameMode === "bot" && currentTurn !== playerSide) {
-            setTimeout(makeBotMove, 500);
+        function handleDrop(row, col) {
+            if (!selectedPiece) return;
+            let piece = boardStateAt(selectedPiece.row, selectedPiece.col);
+            if (!piece) return;
+            if (validMoves.some(m => m.row === row && m.col === col)) {
+                const isPromotion = piece.type === "PAWN" && ((piece.color === "white" && row === 0) || (piece.color === "black" && row === 7));
+                let move = {
+                    fromRow: selectedPiece.row,
+                    fromCol: selectedPiece.col,
+                    toRow: row,
+                    toCol: col,
+                    color: piece.color
+                };
+                if (isPromotion) showPromotion(move);
+                else sendMove(move);
+            }
         }
-    }
-});
-        // Initialize the game
-        updateTurnIndicator();
-        loadBoard();
+        function resetGame() {
+            return fetch('/reset', { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        currentTurn = "white";
+                        selectedPiece = null;
+                        validMoves = [];
+                        lastMove = null;
+                        moveHistory = [];
+                        _latestBoardState = null;
+                        gameOver = false;
+                        gameStarted = false;
+                        updateMoveHistory();
+                        updateStatusBar("Game reset. Select mode and confirm to start.");
+                        loadBoard();
+                        modeSelectGroup.style.display = "";
+                        undoBtn.disabled = true;
+                        botMoveBtn.style.display = "none";
+                        if (gameMode === 'bot')
+                            sideSelect.style.display = "block";
+                        else
+                            sideSelect.style.display = "none";
+                    }
+                    return res.success;
+                });
+        }
+        function handleGameStatus(gameStatus) {
+            if (gameStatus.startsWith("checkmate")) {
+                gameOver = true;
+                let winner = gameStatus.includes("white") ? "Black" : "White";
+                updateStatusBar(`Checkmate! ${winner} wins.`);
+            } else if (gameStatus === "stalemate") {
+                gameOver = true;
+                updateStatusBar("Stalemate: Game is drawn.");
+            } else if (gameStatus === "draw") {
+                gameOver = true;
+                updateStatusBar("Draw!");
+            } else if (gameStatus.startsWith("check")) {
+                updateStatusBar("Check!");
+            } else {
+                updateStatusBar(capitalize(currentTurn) + "'s turn");
+            }
+        }
+        function showPromotion(move) {
+            promotionPopup.style.display = "flex";
+            promotionMove = move;
+        }
+        function hidePromotion() {
+            promotionPopup.style.display = "none";
+            promotionMove = null;
+        }
+        promotionPopup.querySelectorAll('.promotion-btn').forEach(btn => {
+            btn.onclick = () => {
+                if (!promotionMove) return;
+                promotionMove.promotion = btn.dataset.piece;
+                sendMove(promotionMove);
+                hidePromotion();
+            };
+        });
+        undoBtn.onclick = () => {
+            fetch('/undo', { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        moveHistory = res.moveHistory || [];
+                        currentTurn = res.currentTurn || 'white';
+                        lastMove = null;
+                        selectedPiece = null;
+                        validMoves = [];
+                        gameOver = false;
+                        _latestBoardState = null;
+                        updateMoveHistory();
+                        if (moveHistory.length === 0) {
+                            updateStatusBar('All moves undone. Game start position.');
+                        } else {
+                            handleGameStatus(res.gameStatus);
+                        }
+                        loadBoard();
+                    } else {
+                        alert(res.message);
+                    }
+                });
+        };
+        botMoveBtn.onclick = makeBotMove;
+        window.onload = () => {
+            updateModeButtons();
+            undoBtn.disabled = true;
+            updateStatusBar("Select mode and click Confirm to start the game.");
+            loadBoard();
+        };
     </script>
 </body>
 </html>
