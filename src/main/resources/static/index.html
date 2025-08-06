@@ -5,229 +5,258 @@
 <title>Chess Master</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-    :root {
-        --light-square: #53524e;
-        --dark-square: #6d8346;
-        --highlight: #a3d3a3;
-        --valid-move: #85d58588;
-        --last-move: #edffed6b;
-        --capture-move: #cc555566;
-    }
-    body {
-        margin: 0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: #242933;
-        color: #ffe;
-        min-height: 100vh;
-    }
+:root {
+    --light-square: #53524e;
+    --dark-square: #6d8346;
+    --highlight: #a3d3a3;
+    --valid-move: #85d58588;
+    --last-move: #edffed6b;
+    --capture-move: #cc555566;
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #242933;
+    color: #ffe;
+    min-height: 100vh;
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    gap: 36px;
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.board-panel { }
+
+.chessboard {
+    display: grid;
+    grid-template-columns: repeat(8, 56px);
+    grid-template-rows: repeat(8, 56px);
+    border: 2px solid #181c20;
+    border-radius: 10px;
+    box-shadow: 0 6px 32px #0008;
+    background: #181c20;
+}
+
+.square {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5em;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.white { background: var(--light-square); }
+.black { background: var(--dark-square); }
+
+.selected { box-shadow: 0 0 0 4px var(--highlight) inset; }
+.valid-move { box-shadow: 0 0 0 4px var(--valid-move) inset; }
+.last-move { background: var(--last-move) !important; }
+
+.capture::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: var(--capture-move);
+    z-index: 1;
+}
+
+.piece {
+    z-index: 2;
+}
+
+.white-piece {
+    color: #fff !important;
+    text-shadow: 0 1px 4px #adadad22, 0 0 1px #9997;
+    font-weight: 50;
+}
+
+.black-piece {
+    color: #1a1a1a !important;
+    text-shadow: 0 0 1px #0008; 
+    font-weight: 50;
+}
+
+.ui-panel {
+    background: #181c20cc;
+    border-radius: 10px;
+    box-shadow: 0 2px 18px #0007;
+    padding: 18px 14px;
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 260px;
+    max-width: 95vw;
+}
+
+.major-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+button {
+    padding: 10px 0;
+    font-size: 1em;
+    border: none;
+    background: linear-gradient(135deg, #b1d8b1, #6d8346);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 3px 10px #4a6e4a99;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+button:hover {
+    background: linear-gradient(135deg, #95c195, #468036);
+    color: #fff;
+}
+
+#undoBtn:disabled {
+    background: #b9b9b9;
+    color: #777;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.move-history {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 1em;
+    background: #242933;
+    color: #e0e0d9;
+    border-radius: 5px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px 8px;
+    margin-bottom: 12px;
+    box-shadow: inset 0 0 10px #3a4a2f99;
+}
+
+.status-bar {
+    background: #6d8346;
+    padding: 10px 0;
+    margin-bottom: 10px;
+    font-weight: 700;
+    border-radius: 10px;
+    text-align: center;
+    color: #e4f0e2;
+    font-size: 1.2em;
+    min-height: 32px;
+    box-shadow: inset 0 0 8px #8daa6985;
+}
+
+.select-promotion {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.promotion-btn {
+    font-size: 1.4em;
+    background: #a3d3a3;
+    color: #264326;
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px #517b36aa;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.promotion-btn:hover {
+    background: #6d8346;
+    color: #dae5bd;
+}
+
+/* Mode selection buttons */
+.mode-select-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.mode-btn {
+    background: #557a3e;
+    color: #e4f0e2;
+    border-radius: 10px;
+    border: none;
+    font-size: 1.1em;
+    padding: 12px 0;
+    cursor: pointer;
+    font-weight: 700;
+    box-shadow: 0 3px 10px #385122bb;
+    transition: background 0.25s ease;
+}
+
+.mode-btn.active, .mode-btn:active {
+    background: #a3d3a3;
+    color: #264326;
+    box-shadow: 0 3px 10px #517b36cc;
+}
+
+.confirm-btn {
+    font-weight: 700;
+    background: #517b36;
+    color: #d3ead3;
+    border-radius: 10px;
+    padding: 12px 0;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: 0 5px 10px #00000077;
+}
+
+.confirm-btn:hover {
+    background: #6d8346;
+}
+
+#sideSelect {
+    margin-left: 4px;
+    padding: 8px 6px;
+    border-radius: 8px;
+    border: 1px solid #8da06c;
+    width: 75%;
+    max-width: 140px;
+    background: #557a3e;
+    color: #e4f0e2;
+    font-weight: 700;
+    box-shadow: inset 0 0 5px #3a4a2fbb;
+    cursor: pointer;
+}
+
+@media (max-width: 850px) {
     .container {
-        display: flex;
-        flex-direction: row;
-        gap: 36px;
-        justify-content: center;
-        margin-top: 24px;
-        flex-wrap: wrap;
-    }
-    .board-panel { }
-    .chessboard {
-        display: grid;
-        grid-template-columns: repeat(8, 56px);
-        grid-template-rows: repeat(8, 56px);
-        border: 2px solid #181c20;
-        border-radius: 10px;
-        box-shadow: 0 6px 32px #0008;
-        background: #181c20;
-    }
-    .square {
-        width: 56px;
-        height: 56px;
-        display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
-        font-size: 2.5em;
-        position: relative;
-        cursor: pointer;
-        user-select: none;
-    }
-    .white { background: var(--light-square); }
-    .black { background: var(--dark-square); }
-    .selected { box-shadow: 0 0 0 4px var(--highlight) inset; }
-    .valid-move { box-shadow: 0 0 0 4px var(--valid-move) inset; }
-    .last-move { background: var(--last-move) !important; }
-    .capture::before {
-        content: "";
-        position: absolute;
-        left: 0; top: 0;
-        width: 100%; height: 100%;
-        border-radius: 50%;
-        background: var(--capture-move);
-        z-index: 1;
-    }
-    .piece {
-        z-index: 2;
-    }
-    .white-piece {
-        color: #fff !important;
-        text-shadow: 0 1px 4px #adadad22, 0 0 1px #9997;
-        font-weight: 50;
-    }
-    .black-piece {
-        color: #1a1a1a !important;
-        text-shadow: 0 0 1px #0008; 
-        font-weight: 50;
     }
     .ui-panel {
-        background: #181c20cc;
-        border-radius: 10px;
-        box-shadow: 0 2px 18px #0007;
-        padding: 18px 14px;
-        width: 260px;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-        min-width: 260px;
-        max-width: 95vw;
+        width: 100vw;
+        max-width: 350px;
     }
-    .major-btn-group {
-        display: flex;
-        flex-direction: column;
-        gap: 9px;
+    .chessboard {
+        grid-template-columns: repeat(8, 10vw);
+        grid-template-rows: repeat(8, 10vw);
+        max-width: 90vw;
     }
-    button {
-        padding: 10px 0;
-        font-size: 1em;
-        border: none;
-        background: linear-gradient(135deg, #b1d8b1, #6d8346);
-        color: #fff;
-        font-weight: 600;
-        box-shadow: 0 3px 10px #4a6e4a99;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background 0.3s ease, color 0.3s ease;
-    }
-    button:hover {
-        background: linear-gradient(135deg, #95c195, #468036);
-        color: #fff;
-    }
-    #undoBtn:disabled {
-        background: #b9b9b9;
-        color: #777;
-        cursor: not-allowed;
-        box-shadow: none;
-    }
-    .move-history {
-        font-family: 'JetBrains Mono', 'Courier New', monospace;
-        font-size: 1em;
-        background: #242933;
-        color: #e0e0d9;
-        border-radius: 5px;
-        max-width: 100%;
-        white-space: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding: 5px 8px;
-        margin-bottom: 12px;
-        box-shadow: inset 0 0 10px #3a4a2f99;
-    }
-    .status-bar {
-        background: #6d8346;
-        padding: 10px 0;
-        margin-bottom: 10px;
-        font-weight: 700;
-        border-radius: 10px;
-        text-align: center;
-        color: #e4f0e2;
-        font-size: 1.2em;
-        min-height: 32px;
-        box-shadow: inset 0 0 8px #8daa6985;
-    }
-    .select-promotion {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        justify-content: center;
-        margin: 16px 0;
-    }
-    .promotion-btn {
-        font-size: 1.4em;
-        background: #a3d3a3;
-        color: #264326;
-        padding: 10px 16px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px #517b36aa;
-        cursor: pointer;
-        transition: background 0.3s ease;
-    }
-    .promotion-btn:hover {
-        background: #6d8346;
-        color: #dae5bd;
-    }
-    /* Mode selection buttons */
-    .mode-select-group {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 18px;
-    }
-    .mode-btn {
-        background: #557a3e;
-        color: #e4f0e2;
-        border-radius: 10px;
-        border: none;
-        font-size: 1.1em;
-        padding: 12px 0;
-        cursor: pointer;
-        font-weight: 700;
-        box-shadow: 0 3px 10px #385122bb;
-        transition: background 0.25s ease;
-    }
-    .mode-btn.active, .mode-btn:active {
-        background: #a3d3a3;
-        color: #264326;
-        box-shadow: 0 3px 10px #517b36cc;
-    }
-    .confirm-btn {
-        font-weight: 700;
-        background: #517b36;
-        color: #d3ead3;
-        border-radius: 10px;
-        padding: 12px 0;
-        cursor: pointer;
-        transition: background 0.3s ease;
-        box-shadow: 0 5px 10px #00000077;
-    }
-    .confirm-btn:hover {
-        background: #6d8346;
-    }
-    #sideSelect {
-        margin-left: 4px;
-        padding: 8px 6px;
-        border-radius: 8px;
-        border: 1px solid #8da06c;
-        width: 75%;
-        max-width: 140px;
-        background: #557a3e;
-        color: #e4f0e2;
-        font-weight: 700;
-        box-shadow: inset 0 0 5px #3a4a2fbb;
-        cursor: pointer;
-    }
-    @media (max-width: 850px) {
-        .container {
-            flex-direction: column;
-            align-items: center;
-        }
-        .ui-panel {
-            width: 100vw;
-            max-width: 350px;
-        }
-        .chessboard {
-            grid-template-columns: repeat(8, 10vw);
-            grid-template-rows: repeat(8, 10vw);
-            max-width: 90vw;
-        }
-        .square { font-size: 7vw; }
-    }
+    .square { font-size: 7vw; }
+}
+
 </style>
 </head>
 <body>
@@ -271,20 +300,6 @@
 </div>
 
 <script>
-    // Get references to DOM elements
-const modeSelectGroup = document.getElementById('modeSelectGroup');
-const pvpBtn = document.getElementById('pvpBtn');
-const pvbBtn = document.getElementById('pvbBtn');
-const confirmBtn = document.getElementById('confirmModeBtn');
-const sideSelect = document.getElementById('sideSelect');
-const undoBtn = document.getElementById('undoBtn');
-const resetBtn = document.getElementById('resetBtn');
-const botMoveBtn = document.getElementById('botMoveBtn');
-const statusBar = document.getElementById('statusBar');
-const historyPanel = document.getElementById('moveHistory');
-const chessboard = document.getElementById('chessboard');
-const promotionPopup = document.getElementById('promotionPopup');
-
 // Unicode symbols mapping by piece type and color
 const pieceUnicode = {
   PAWN:   { white: "♙", black: "♟" },
@@ -308,14 +323,25 @@ let promotionMove = null;
 let gameStarted = false;
 let gameOver = false;
 
-// Update active mode button and side selector visibility
+const modeSelectGroup = document.getElementById('modeSelectGroup');
+const pvpBtn = document.getElementById('pvpBtn');
+const pvbBtn = document.getElementById('pvbBtn');
+const confirmBtn = document.getElementById('confirmModeBtn');
+const sideSelect = document.getElementById('sideSelect');
+const undoBtn = document.getElementById('undoBtn');
+const resetBtn = document.getElementById('resetBtn');
+const botMoveBtn = document.getElementById('botMoveBtn');
+const statusBar = document.getElementById('statusBar');
+const historyPanel = document.getElementById('moveHistory');
+const chessboard = document.getElementById('chessboard');
+const promotionPopup = document.getElementById('promotionPopup');
+
 function updateModeButtons() {
   pvpBtn.classList.toggle('active', gameMode === 'player');
   pvbBtn.classList.toggle('active', gameMode === 'bot');
   sideSelect.style.display = gameMode === 'bot' ? 'block' : 'none';
 }
 
-// Mode buttons handlers
 pvpBtn.onclick = () => {
   gameMode = 'player';
   updateModeButtons();
@@ -328,12 +354,10 @@ sideSelect.onchange = () => {
   playerSide = sideSelect.value;
 };
 
-// Capitalize helper
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// Confirm button to start game and hide mode selection
 confirmBtn.onclick = () => {
   modeConfirmed = true;
   modeSelectGroup.style.display = 'none';
@@ -349,6 +373,8 @@ confirmBtn.onclick = () => {
     if (gameMode === 'bot') {
       botMoveBtn.style.display = 'inline-block';
       sideSelect.style.display = 'block';
+
+      // if bot plays first (human = black, bot = white), bot makes its move immediately
       if (playerSide === 'black' && currentTurn === 'white') {
         makeBotMove();
       }
@@ -361,155 +387,156 @@ confirmBtn.onclick = () => {
   });
 };
 
-// Reset button resets game and shows mode selector again
+
 resetBtn.onclick = () => {
   resetGame().then(success => {
-    if(!success) return;
-
+    if (!success) return;
     modeConfirmed = false;
     gameStarted = false;
     gameOver = false;
-
     modeSelectGroup.style.display = '';
     botMoveBtn.style.display = 'none';
     sideSelect.style.display = 'none';
-
     updateStatus('Select mode and click Confirm to start');
     moveHistory = [];
     updateMoveHistory();
-
     undoBtn.disabled = true;
   });
 };
 
-function updateStatus(msg){
+function updateStatus(msg) {
   statusBar.innerHTML = msg || '';
 }
 
-function updateMoveHistory(){
+function updateMoveHistory() {
   let html = '';
-  for(let i=0; i<moveHistory.length; i+=2){
+  for (let i = 0; i < moveHistory.length; i += 2) {
     const moveNumber = (i / 2) + 1;
     const whiteMove = moveHistory[i] || '';
-    const blackMove = moveHistory[i+1] || '';
+    const blackMove = moveHistory[i + 1] || '';
     html += `<span>${moveNumber}. ${whiteMove} ${blackMove}</span> `;
   }
   historyPanel.innerHTML = html.trim();
   undoBtn.disabled = !gameStarted || moveHistory.length === 0;
 }
 
-function getBoardSquare(row, col){
+function getBoardSquare(row, col) {
   return boardState?.[row]?.[col];
 }
 
-function renderBoard(boardData){
+function renderBoard(boardData) {
   chessboard.innerHTML = '';
-  for(let r=0; r<8; r++){
-    for(let c=0; c<8; c++){
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
       const sq = document.createElement('div');
-      const isLight = (r+c)%2 === 0;
+      const isLight = (r + c) % 2 === 0;
       sq.className = 'square ' + (isLight ? 'white' : 'black');
       sq.dataset.row = r;
       sq.dataset.col = c;
 
-      if(lastMove && ((r === lastMove.fromRow && c === lastMove.fromCol) ||
-                      (r === lastMove.toRow && c === lastMove.toCol))) {
+      // Highlighting for last move
+      if (
+        lastMove &&
+        ((r === lastMove.fromRow && c === lastMove.fromCol) ||
+          (r === lastMove.toRow && c === lastMove.toCol))
+      ) {
         sq.classList.add('last-move');
       }
 
       const piece = boardData[r][c];
-      if(piece){
+      if (piece) {
         const pieceSpan = document.createElement('span');
         pieceSpan.className = 'piece ' + (piece.color === 'white' ? 'white-piece' : 'black-piece');
         pieceSpan.textContent = pieceUnicode[piece.type][piece.color];
-        pieceSpan.setAttribute('draggable', gameStarted && !gameOver);
         sq.appendChild(pieceSpan);
       }
-      if(selected && selected.row === r && selected.col === c){
+      // Highlight selected square
+      if (selected && selected.row === r && selected.col === c) {
         sq.classList.add('selected');
       }
-      if(validMoves.some(m => m.row === r && m.col === c)){
+      // Highlight valid moves
+      if (validMoves.some(m => m.row === r && m.col === c)) {
         sq.classList.add('valid-move');
-        if(piece){
+        if (piece) {
           sq.classList.add('capture');
         }
       }
       sq.addEventListener('click', () => handleSquareClick(r, c));
-      sq.addEventListener('dragover', e => e.preventDefault());
-      sq.addEventListener('drop', e => {
-        e.preventDefault();
-        handleDrop(r, c);
-      });
-
       chessboard.appendChild(sq);
     }
   }
 }
 
-function loadBoard(){
-  fetch('/board')
-    .then(r => r.json())
-    .then(data => {
-      boardState = data;
-      renderBoard(data);
-    });
+
+function loadBoard() {
+ fetch('/board')
+  .then(r => r.json())
+  .then(data => {
+    boardState = data.board;       
+    renderBoard(boardState);
+  });
+
 }
 
-function fetchValidMoves(row, col){
+function fetchValidMoves(row, col) {
   fetch('/valid-moves', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({row, col})
-  }).then(r => r.json())
-    .then(res => {
-      if(res.success){
-        validMoves = res.validMoves;
-        renderBoard(boardState);
-      }
-    });
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      validMoves = res.validMoves;
+      renderBoard(boardState);
+    }
+  });
 }
 
-function sendMove(move){
+
+function sendMove(move) {
   hidePromotion();
   fetch('/move', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(move)
-  }).then(r => r.json())
-    .then(res => {
-      if(res.success){
-        currentTurn = res.currentTurn;
-        lastMove = {
-          fromRow: move.fromRow,
-          fromCol: move.fromCol,
-          toRow: move.toRow,
-          toCol: move.toCol
-        };
-        selected = null;
-        validMoves = [];
-        moveHistory = res.moveHistory || moveHistory;
-        boardState = null;
-        updateMoveHistory();
-        handleGameStatus(res.gameStatus);
-        loadBoard();
-        if(gameMode === 'bot' && currentTurn !== playerSide && !gameOver){
-          setTimeout(makeBotMove, 600);
-        }
-      } else {
-        alert(res.message);
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      currentTurn = res.currentTurn;
+      lastMove = {
+        fromRow: move.fromRow,
+        fromCol: move.fromCol,
+        toRow: move.toRow,
+        toCol: move.toCol
+      };
+      selected = null;
+      validMoves = [];
+      moveHistory = res.moveHistory || moveHistory;
+      updateMoveHistory();
+      handleGameStatus(res.gameStatus);
+      loadBoard();
+      if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
+        setTimeout(makeBotMove, 600);
       }
-    }).catch(() => alert('Error communicating with server.'));
+    } else {
+      alert(res.message);
+    }
+  });
 }
 
-function makeBotMove(){
-  if(gameOver) return;
+
+function makeBotMove() {
+  if (gameOver) return;
   fetch('/bot-move', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({color: currentTurn})
-  }).then(r => r.json())
+  })
+    .then(r => r.json())
     .then(res => {
-      if(res.success){
+      if (res.success) {
         lastMove = parseMoveString(res.move);
         currentTurn = res.currentTurn;
         moveHistory = res.moveHistory || moveHistory;
@@ -522,34 +549,34 @@ function makeBotMove(){
     });
 }
 
-function parseMoveString(str){
-  if(!str || str.length < 4) return null;
+function parseMoveString(str) {
+  if (!str || str.length < 4) return null;
   const fromCol = str.charCodeAt(0) - 97;
-  const fromRow = 8 - (+str[1]);
+  const fromRow = 8 - +str[1];
   const toCol = str.charCodeAt(2) - 97;
-  const toRow = 8 - (+str[3]);
+  const toRow = 8 - +str[3];
   return {fromRow, fromCol, toRow, toCol};
 }
 
-function handleSquareClick(row, col){
-  if(!gameStarted || gameOver) return;
+function handleSquareClick(row, col) {
+  if (!gameStarted || gameOver) return;
   const sq = getBoardSquare(row, col);
-  if(!selected){
-    if(!sq) return;
-    if(gameMode === 'bot' && sq.color !== playerSide) return;
-    if(sq.color !== currentTurn) return;
+  if (!selected) {
+    if (!sq) return;
+    if (gameMode === 'bot' && sq.color !== playerSide) return;
+    if (sq.color !== currentTurn) return;
     selected = {row, col, color: sq.color};
     fetchValidMoves(row, col);
   } else {
-    if(selected.row === row && selected.col === col){
+    if (selected.row === row && selected.col === col) {
       selected = null;
       validMoves = [];
       renderBoard(boardState);
       return;
     }
-    if(validMoves.some(m => m.row === row && m.col === col)){
+    if (validMoves.some(m => m.row === row && m.col === col)) {
       const promotionNeeded = (selected.color === 'white' && row === 0) || (selected.color === 'black' && row === 7);
-      if(promotionNeeded && getBoardSquare(selected.row, selected.col).type === 'PAWN'){
+      if (promotionNeeded && getBoardSquare(selected.row, selected.col).type === 'PAWN') {
         promotionMove = {fromRow: selected.row, fromCol: selected.col, toRow: row, toCol: col, color: selected.color};
         showPromotion();
       } else {
@@ -563,13 +590,13 @@ function handleSquareClick(row, col){
   }
 }
 
-function handleDrop(row, col){
-  if(!selected) return;
+function handleDrop(row, col) {
+  if (!selected) return;
   const pawn = getBoardSquare(selected.row, selected.col);
-  if(!pawn) return;
-  if(validMoves.some(m => m.row === row && m.col === col)){
+  if (!pawn) return;
+  if (validMoves.some(m => m.row === row && m.col === col)) {
     const promotionRequired = (pawn.color === 'white' && row === 0) || (pawn.color === 'black' && row === 7);
-    if(promotionRequired && pawn.type === 'PAWN'){
+    if (promotionRequired && pawn.type === 'PAWN') {
       promotionMove = {fromRow: selected.row, fromCol: selected.col, toRow: row, toCol: col, color: pawn.color};
       showPromotion();
     } else {
@@ -578,48 +605,69 @@ function handleDrop(row, col){
   }
 }
 
-function hidePromotion(){
+function hidePromotion() {
   promotionPopup.style.display = 'none';
   promotionMove = null;
 }
 
-function showPromotion(){
+function showPromotion() {
   promotionPopup.style.display = 'flex';
 }
 
 promotionPopup.querySelectorAll('.promotion-btn').forEach(btn => {
   btn.onclick = () => {
-    if(!promotionMove) return;
+    if (!promotionMove) return;
     promotionMove.promotion = btn.dataset.piece;
     sendMove(promotionMove);
     hidePromotion();
   };
 });
 
-function handleGameStatus(status){
-  if(status.startsWith('checkmate')){
-    gameOver = true;
-    const winner = status.includes('white') ? 'White' : 'Black';
-    updateStatus(`${winner} wins by checkmate!`);
-  } else if(status === 'stalemate'){
-    gameOver = true;
-    updateStatus('Game drawn by stalemate.');
-  } else if(status === 'draw'){
-    gameOver = true;
-    updateStatus('Game drawn.');
-  } else if(status.startsWith('check')){
-    updateStatus('Check!');
+function handleSquareClick(row, col) {
+  if (!gameStarted || gameOver) return;
+  const sq = getBoardSquare(row, col);
+
+  // First click: select if it's your piece
+  if (!selected) {
+    if (!sq) return;
+    if (gameMode === 'bot' && sq.color !== playerSide) return;
+    if (sq.color !== currentTurn) return;
+    selected = {row, col, color: sq.color};
+    fetchValidMoves(row, col);
   } else {
-    gameOver = false;
-    updateStatus(`${capitalize(currentTurn)} to move`);
+    // Deselect if same square
+    if (selected.row === row && selected.col === col) {
+      selected = null;
+      validMoves = [];
+      renderBoard(boardState);
+      return;
+    }
+    // If clicked square is a valid move, submit move
+    if (validMoves.some(m => m.row === row && m.col === col)) {
+      // Check for pawn promotion
+      const promotionNeeded =
+        (selected.color === 'white' && row === 0) ||
+        (selected.color === 'black' && row === 7);
+      if (promotionNeeded && getBoardSquare(selected.row, selected.col).type === 'PAWN') {
+        promotionMove = {fromRow: selected.row, fromCol: selected.col, toRow: row, toCol: col, color: selected.color};
+        showPromotion();
+      } else {
+        sendMove({fromRow: selected.row, fromCol: selected.col, toRow: row, toCol: col, color: selected.color});
+      }
+    } else {
+      // New selection or invalid, reselect
+      selected = null;
+      validMoves = [];
+      renderBoard(boardState);
+    }
   }
 }
 
-function resetGame(){
-  return fetch('/reset', {method:'POST'})
+function resetGame() {
+  return fetch('/reset', { method: 'POST' })
     .then(r => r.json())
     .then(res => {
-      if(res.success){
+      if (res.success) {
         currentTurn = 'white';
         selected = null;
         moveHistory = [];
@@ -637,11 +685,11 @@ function resetGame(){
 }
 
 undoBtn.onclick = () => {
-  if(!gameStarted || gameOver) return;
-  fetch('/undo', {method:'POST'})
+  if (!gameStarted || gameOver) return;
+  fetch('/undo', {method: 'POST'})
     .then(r => r.json())
     .then(res => {
-      if(res.success){
+      if (res.success) {
         moveHistory = res.moveHistory || [];
         currentTurn = res.currentTurn || currentTurn;
         lastMove = null;
@@ -658,7 +706,7 @@ undoBtn.onclick = () => {
 };
 
 botMoveBtn.onclick = () => {
-  if(!gameStarted || gameOver) return;
+  if (!gameStarted || gameOver) return;
   makeBotMove();
 };
 
@@ -671,7 +719,6 @@ window.onload = () => {
   updateStatus('Select mode and click Confirm to start');
   loadBoard();
 };
-
 </script>
 </body>
 </html>

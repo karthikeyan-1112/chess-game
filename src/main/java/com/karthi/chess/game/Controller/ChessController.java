@@ -1,10 +1,11 @@
 package com.karthi.chess.game.Controller;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Stack;
 
 import org.springframework.http.ResponseEntity;
@@ -13,241 +14,273 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.github.bhlangonijr.chesslib.Board;
-import com.github.bhlangonijr.chesslib.Piece;
-import com.github.bhlangonijr.chesslib.PieceType;
-import com.github.bhlangonijr.chesslib.Side;
-import com.github.bhlangonijr.chesslib.Square;
-import com.github.bhlangonijr.chesslib.move.Move;
-import com.karthi.chess.game.model.ChessAI;
+import com.karthi.chess.game.engine.Stockfish;
 
 @RestController
 public class ChessController {
 
     private static final String STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    private final Board board = new Board();
+    private String currentFen = STARTING_FEN;
     private final List<String> moveHistory = new ArrayList<>();
-    private final Stack<String> historyFenStack = new Stack<>();
+    private final Stack<String> fenStack = new Stack<>();
+
+    private static final Map<Character, String> pieceNameMap = new HashMap<>();
+    static {
+        pieceNameMap.put('p', "PAWN");
+        pieceNameMap.put('r', "ROOK");
+        pieceNameMap.put('n', "KNIGHT");
+        pieceNameMap.put('b', "BISHOP");
+        pieceNameMap.put('q', "QUEEN");
+        pieceNameMap.put('k', "KING");
+    }
 
     public ChessController() {
-        board.loadFromFen(STARTING_FEN);
-        historyFenStack.push(STARTING_FEN);
+        fenStack.push(currentFen);
     }
-    
+
     @GetMapping("/board")
-    @SuppressWarnings("unchecked")
-    public Map<String, Object>[][] getBoard() {
-        Map<String, Object>[][] boardState = (Map<String, Object>[][]) new HashMap[8][8];
-        for (Square sq : Square.values()) {
-            if (sq.ordinal() >= 64) continue;
-            int row = 7 - sq.getRank().ordinal();
-            int col = sq.getFile().ordinal();
-            Piece piece = board.getPiece(sq);
-            if (!piece.equals(Piece.NONE)) {
-                boardState[row][col] = new HashMap<>();
-                boardState[row][col].put("type", piece.getPieceType().toString());
-                boardState[row][col].put("color", piece.getPieceSide().toString().toLowerCase());
-                if (piece.getPieceType() == PieceType.KING) {
-                    boardState[row][col].put("inCheck", board.isKingAttacked());
+    public Map<String, Object> getBoard() {
+        Object[][] board = fenToBoardArray(currentFen);
+        Map<String, Object> out = new HashMap<>();
+        out.put("board", board);
+        out.put("moveHistory", new ArrayList<>(moveHistory));
+        out.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
+        out.put("fen", currentFen);
+        return out;
+    }
+
+    private Object[][] fenToBoardArray(String fen) {
+        String[] rows = fen.split(" ")[0].split("/");
+        Object[][] board = new Object[8][8];
+        for (int r = 0; r < 8; r++) {
+            int file = 0;
+            for (char ch : rows[r].toCharArray()) {
+                if (Character.isDigit(ch)) {
+                    file += Character.getNumericValue(ch);
+                } else {
+                    String color = Character.isUpperCase(ch) ? "white" : "black";
+                    String type = pieceNameMap.get(Character.toLowerCase(ch));
+                    Map<String, String> piece = new HashMap<>();
+                    piece.put("type", type);
+                    piece.put("color", color);
+                    board[r][file] = piece;
+                    file++;
                 }
-            } else {
-                boardState[row][col] = null;
             }
         }
-        return boardState;
+        return board;
     }
 
     @PostMapping("/move")
-    public ResponseEntity<Map<String, Object>> move(@RequestBody Map<String, Object> moveData) {
+    public ResponseEntity<Map<String, Object>> playerMove(@RequestBody Map<String, Object> moveData) {
         Map<String, Object> response = new HashMap<>();
         try {
-            int fromRow = intFromObj(moveData.get("fromRow"));
-            int fromCol = intFromObj(moveData.get("fromCol"));
-            int toRow = intFromObj(moveData.get("toRow"));
-            int toCol = intFromObj(moveData.get("toCol"));
-            String color = moveData.get("color").toString().toLowerCase();
-            Side playerSide = "white".equals(color) ? Side.WHITE : Side.BLACK;
-            
-            if (board.getSideToMove() != playerSide) {
+            int fromRow = ((Number) moveData.get("fromRow")).intValue();
+            int fromCol = ((Number) moveData.get("fromCol")).intValue();
+            int toRow = ((Number) moveData.get("toRow")).intValue();
+            int toCol = ((Number) moveData.get("toCol")).intValue();
+            String promotion = moveData.containsKey("promotion") ? (String) moveData.get("promotion") : null;
+
+            String move = indexToAlgebraic(fromRow, fromCol) + indexToAlgebraic(toRow, toCol);
+            if (promotion != null) {
+                move += promotion.substring(0, 1).toLowerCase();
+            }
+
+            Stockfish sf = new Stockfish();
+            if (!sf.startEngine()) {
                 response.put("success", false);
-                response.put("message", "It's not your turn.");
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
+                response.put("message", "Failed to start Stockfish");
+                return ResponseEntity.internalServerError().body(response);
+            }
+
+            List<String> legalMoves = getLegalMoves(currentFen, sf);
+            if (!legalMoves.contains(move)) {
+                response.put("success", false);
+                response.put("message", "Illegal move: " + move);
+                sf.stopEngine();
                 return ResponseEntity.ok(response);
             }
-            
-            Square from = Square.valueOf((char)('A' + fromCol) + "" + (8 - fromRow));
-            Square to = Square.valueOf((char)('A' + toCol) + "" + (8 - toRow));
-            Move move;
-            // Handle promotion if present
-            if (moveData.containsKey("promotion")) {
-                String promotionStr = moveData.get("promotion").toString().toUpperCase();
-                if (!Set.of("QUEEN", "ROOK", "BISHOP", "KNIGHT").contains(promotionStr)) {
-                    response.put("success", false);
-                    response.put("message", "Invalid promotion piece: " + promotionStr);
-                    response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-                    return ResponseEntity.ok(response);
-                }
-                Piece promotedPiece = Piece.make(playerSide, PieceType.valueOf(promotionStr));
-                move = new Move(from, to, promotedPiece);
-            } else {
-                move = new Move(from, to);
-            }
-            
-            if (board.isMoveLegal(move, true)) {
-                board.doMove(move);
-                moveHistory.add(move.toString());
-                historyFenStack.push(board.getFen());
-                response.put("success", true);
-                response.put("move", move.toString());
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-                response.put("gameStatus", getCurrentGameStatus());
-                response.put("moveHistory", new ArrayList<>(moveHistory));
-            } else {
-                response.put("success", false);
-                response.put("message", "Invalid move");
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-            }
-            return ResponseEntity.ok(response);
+
+            currentFen = getFenAfterMove(currentFen, move, sf);
+            fenStack.push(currentFen);
+            moveHistory.add(move);
+
+            sf.stopEngine();
+
+            response.put("success", true);
+            response.put("fen", currentFen);
+            response.put("move", move);
+            response.put("moveHistory", new ArrayList<>(moveHistory));
+            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
+            response.put("gameStatus", "normal");
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
-            response.put("message", "Error: " + e.getMessage());
-            response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
+            response.put("message", e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/bot-move")
     public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
         try {
-            String color = request.get("color").toLowerCase();
-            Side aiSide = "white".equals(color) ? Side.WHITE : Side.BLACK;
-
-            if (board.getSideToMove() != aiSide) {
+            String color = request.get("color");
+            String fenTurn = currentFen.split(" ")[1].equals("w") ? "white" : "black";
+            if (!color.equalsIgnoreCase(fenTurn)) {
                 response.put("success", false);
-                response.put("message", "Not " + color + "'s turn!");
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
+                response.put("message", "Not " + color + "'s turn");
                 return ResponseEntity.ok(response);
             }
 
-            Move bestMove = ChessAI.getGreedyMove(board, aiSide);
-            if (bestMove != null && board.isMoveLegal(bestMove, true)) {
-                board.doMove(bestMove);
-                moveHistory.add(bestMove.toString());
-                historyFenStack.push(board.getFen());
-                response.put("success", true);
-                response.put("move", bestMove.toString());
-                response.put("gameStatus", getCurrentGameStatus());
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-                response.put("moveHistory", new ArrayList<>(moveHistory));
-            } else {
+            Stockfish sf = new Stockfish();
+            if (!sf.startEngine()) {
                 response.put("success", false);
-                response.put("message", "No legal moves available.");
-                response.put("gameStatus", getCurrentGameStatus());
-                response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
+                response.put("message", "Failed to start Stockfish");
+                return ResponseEntity.internalServerError().body(response);
             }
-            return ResponseEntity.ok(response);
+
+            String bestMove = sf.getBestMove(currentFen, 500);
+
+            if (bestMove == null) {
+                response.put("success", false);
+                response.put("message", "No move found");
+                sf.stopEngine();
+                return ResponseEntity.ok(response);
+            }
+
+            currentFen = getFenAfterMove(currentFen, bestMove, sf);
+            fenStack.push(currentFen);
+            moveHistory.add(bestMove);
+
+            sf.stopEngine();
+
+            response.put("success", true);
+            response.put("move", bestMove);
+            response.put("fen", currentFen);
+            response.put("moveHistory", new ArrayList<>(moveHistory));
+            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
+            response.put("gameStatus", "normal");
+
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
-            response.put("message", "Error: " + e.getMessage());
+            response.put("message", e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/valid-moves")
-    public ResponseEntity<Map<String, Object>> getValidMoves(@RequestBody Map<String, Integer> input) {
+    public Map<String, Object> getValidMoves(@RequestBody Map<String, Integer> input) {
         Map<String, Object> response = new HashMap<>();
         try {
-            int fromRow = intFromObj(input.get("row"));
-            int fromCol = intFromObj(input.get("col"));
-            Square fromSquare = Square.valueOf((char)('A' + fromCol) + "" + (8 - fromRow));
-            List<Move> legalMoves = board.legalMoves();
-            List<Map<String, Integer>> validMoves = new ArrayList<>();
-            for (Move move : legalMoves) {
-                if (move.getFrom().equals(fromSquare)) {
-                    Square to = move.getTo();
-                    int toRow = 7 - to.getRank().ordinal();
-                    int toCol = to.getFile().ordinal();
-                    Map<String, Integer> moveMap = new HashMap<>();
-                    moveMap.put("row", toRow);
-                    moveMap.put("col", toCol);
-                    validMoves.add(moveMap);
+            int row = input.get("row");
+            int col = input.get("col");
+            List<Map<String, Integer>> validMovesList = new ArrayList<>();
+
+            Stockfish sf = new Stockfish();
+            if (!sf.startEngine()) {
+                response.put("success", false);
+                response.put("message", "Failed to start Stockfish");
+                return response;
+            }
+
+            sf.sendCommand("position fen " + currentFen);
+            sf.sendCommand("d");
+            String output = sf.getOutput(100);
+
+            List<String> allMoves = parseLegalMovesFromOutput(output);
+
+            String sourceSquare = indexToAlgebraic(row, col);
+
+            for (String move : allMoves) {
+                if (move.startsWith(sourceSquare)) {
+                    int destCol = move.charAt(2) - 'a';
+                    int destRow = 8 - Character.getNumericValue(move.charAt(3));
+                    Map<String, Integer> mv = new HashMap<>();
+                    mv.put("row", destRow);
+                    mv.put("col", destCol);
+                    validMovesList.add(mv);
                 }
             }
-            response.put("success", true);
-            response.put("validMoves", validMoves);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Error: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
+            sf.stopEngine();
 
-    @PostMapping("/reset")
-    public ResponseEntity<Map<String, Object>> resetGame() {
-        board.loadFromFen(STARTING_FEN);
-        moveHistory.clear();
-        historyFenStack.clear();
-        historyFenStack.push(STARTING_FEN);
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Game reset.");
-        response.put("currentTurn", "white");
-        response.put("gameStatus", "normal");
-        response.put("moveHistory", new ArrayList<>(moveHistory));
-        return ResponseEntity.ok(response);
+            response.put("success", true);
+            response.put("validMoves", validMovesList);
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+        }
+        return response;
     }
 
     @PostMapping("/undo")
     public ResponseEntity<Map<String, Object>> undoMove() {
         Map<String, Object> response = new HashMap<>();
-        if (historyFenStack.size() > 1) {
-            historyFenStack.pop();
-            String fen = historyFenStack.peek();
-            board.loadFromFen(fen);
+        if (fenStack.size() > 1) {
+            fenStack.pop();
+            currentFen = fenStack.peek();
             if (!moveHistory.isEmpty())
                 moveHistory.remove(moveHistory.size() - 1);
-            
             response.put("success", true);
-            response.put("message", "Move undone.");
-            response.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-            response.put("gameStatus", getCurrentGameStatus());
+            response.put("fen", currentFen);
             response.put("moveHistory", new ArrayList<>(moveHistory));
+            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
+            response.put("message", "Move undone");
+            response.put("gameStatus", "normal");
         } else {
             response.put("success", false);
-            response.put("message", "No moves to undo.");
-            response.put("moveHistory", new ArrayList<>(moveHistory));
+            response.put("message", "No move to undo");
         }
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/move-history")
-    public List<String> getMoveHistory() {
-        return new ArrayList<>(moveHistory);
-    }
-
-    // Utility for returning current game status string
-    private String getCurrentGameStatus() {
-        if (board.isMated()) {
-            return board.isKingAttacked()
-                ? "checkmate-" + (board.getSideToMove() == Side.WHITE ? "black" : "white")
-                : "stalemate";
+    private List<String> parseLegalMovesFromOutput(String output) {
+        List<String> moves = new ArrayList<>();
+        for (String line : output.split("\\n")) {
+            if (line.startsWith("Legal moves: ")) {
+                String movesStr = line.substring("Legal moves: ".length()).trim();
+                if (!movesStr.isEmpty()) {
+                    moves.addAll(Arrays.asList(movesStr.split(" ")));
+                }
+                break;
+            }
         }
-        if (board.isStaleMate())
-            return "stalemate";
-        if (board.isKingAttacked())
-            return "check-" + (board.getSideToMove() == Side.WHITE ? "white" : "black");
-        if (board.isDraw())
-            return "draw";
-        return "normal";
+        return moves;
     }
 
-    // Convert various numeric types to int
-    private int intFromObj(Object o) {
-        if (o instanceof Integer i) return i;
-        if (o instanceof Double d) return d.intValue();
-        return Integer.parseInt(o.toString());
+    private String indexToAlgebraic(int row, int col) {
+        char file = (char) ('a' + col);
+        int rank = 8 - row;
+        return "" + file + rank;
+    }
+
+    private List<String> getLegalMoves(String fen, Stockfish sf) throws Exception {
+        sf.sendCommand("position fen " + fen);
+        sf.sendCommand("d");
+        String output = sf.getOutput(100);
+        for (String line : output.split("\\n")) {
+            if (line.startsWith("Legal moves: ")) {
+                String legalMovesStr = line.substring("Legal moves: ".length());
+                return Arrays.asList(legalMovesStr.split(" "));
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    private String getFenAfterMove(String fen, String move, Stockfish sf) throws Exception {
+        sf.sendCommand("position fen " + fen + " moves " + move);
+        sf.sendCommand("d");
+        String output = sf.getOutput(100);
+        for (String line : output.split("\\n")) {
+            if (line.startsWith("Fen: ")) {
+                return line.substring("Fen: ".length());
+            }
+        }
+        return fen;
     }
 }
