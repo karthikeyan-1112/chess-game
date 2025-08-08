@@ -1,25 +1,16 @@
 package com.karthi.chess.game.Controller;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.karthi.chess.game.engine.Stockfish;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
 
 @RestController
 public class ChessController {
 
-    private static final String STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    private static final String STARTING_FEN =
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     private String currentFen = STARTING_FEN;
     private final List<String> moveHistory = new ArrayList<>();
     private final Stack<String> fenStack = new Stack<>();
@@ -40,11 +31,10 @@ public class ChessController {
 
     @GetMapping("/board")
     public Map<String, Object> getBoard() {
-        Object[][] board = fenToBoardArray(currentFen);
         Map<String, Object> out = new HashMap<>();
-        out.put("board", board);
+        out.put("board", fenToBoardArray(currentFen));
         out.put("moveHistory", new ArrayList<>(moveHistory));
-        out.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
+        out.put("currentTurn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
         out.put("fen", currentFen);
         return out;
     }
@@ -90,14 +80,14 @@ public class ChessController {
             if (!sf.startEngine()) {
                 response.put("success", false);
                 response.put("message", "Failed to start Stockfish");
-                return ResponseEntity.internalServerError().body(response);
+                return ResponseEntity.ok(response);
             }
 
             List<String> legalMoves = getLegalMoves(currentFen, sf);
             if (!legalMoves.contains(move)) {
+                sf.stopEngine();
                 response.put("success", false);
                 response.put("message", "Illegal move: " + move);
-                sf.stopEngine();
                 return ResponseEntity.ok(response);
             }
 
@@ -108,17 +98,15 @@ public class ChessController {
             sf.stopEngine();
 
             response.put("success", true);
-            response.put("fen", currentFen);
-            response.put("move", move);
+            response.put("board", fenToBoardArray(currentFen));
+            response.put("currentTurn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
             response.put("moveHistory", new ArrayList<>(moveHistory));
-            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
             response.put("gameStatus", "normal");
 
         } catch (Exception e) {
             e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
         }
         return ResponseEntity.ok(response);
     }
@@ -139,15 +127,14 @@ public class ChessController {
             if (!sf.startEngine()) {
                 response.put("success", false);
                 response.put("message", "Failed to start Stockfish");
-                return ResponseEntity.internalServerError().body(response);
+                return ResponseEntity.ok(response);
             }
 
             String bestMove = sf.getBestMove(currentFen, 500);
-
             if (bestMove == null) {
+                sf.stopEngine();
                 response.put("success", false);
                 response.put("message", "No move found");
-                sf.stopEngine();
                 return ResponseEntity.ok(response);
             }
 
@@ -158,17 +145,15 @@ public class ChessController {
             sf.stopEngine();
 
             response.put("success", true);
-            response.put("move", bestMove);
-            response.put("fen", currentFen);
+            response.put("board", fenToBoardArray(currentFen));
+            response.put("currentTurn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
             response.put("moveHistory", new ArrayList<>(moveHistory));
-            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
             response.put("gameStatus", "normal");
 
         } catch (Exception e) {
             e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
         }
         return ResponseEntity.ok(response);
     }
@@ -179,6 +164,8 @@ public class ChessController {
         try {
             int row = input.get("row");
             int col = input.get("col");
+
+            String sourceSquare = indexToAlgebraic(row, col);
             List<Map<String, Integer>> validMovesList = new ArrayList<>();
 
             Stockfish sf = new Stockfish();
@@ -188,14 +175,7 @@ public class ChessController {
                 return response;
             }
 
-            sf.sendCommand("position fen " + currentFen);
-            sf.sendCommand("d");
-            String output = sf.getOutput(100);
-
-            List<String> allMoves = parseLegalMovesFromOutput(output);
-
-            String sourceSquare = indexToAlgebraic(row, col);
-
+            List<String> allMoves = getLegalMoves(currentFen, sf);
             for (String move : allMoves) {
                 if (move.startsWith(sourceSquare)) {
                     int destCol = move.charAt(2) - 'a';
@@ -210,11 +190,28 @@ public class ChessController {
 
             response.put("success", true);
             response.put("validMoves", validMovesList);
+
         } catch (Exception e) {
             e.printStackTrace();
             response.put("success", false);
             response.put("message", e.getMessage());
         }
+        return response;
+    }
+
+    @PostMapping("/reset")
+    public Map<String, Object> resetGame() {
+        currentFen = STARTING_FEN;
+        fenStack.clear();
+        fenStack.push(currentFen);
+        moveHistory.clear();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("board", fenToBoardArray(currentFen));
+        response.put("currentTurn", "white");
+        response.put("moveHistory", new ArrayList<>());
+        response.put("gameStatus", "normal");
         return response;
     }
 
@@ -227,10 +224,9 @@ public class ChessController {
             if (!moveHistory.isEmpty())
                 moveHistory.remove(moveHistory.size() - 1);
             response.put("success", true);
-            response.put("fen", currentFen);
+            response.put("board", fenToBoardArray(currentFen));
+            response.put("currentTurn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
             response.put("moveHistory", new ArrayList<>(moveHistory));
-            response.put("turn", currentFen.split(" ")[1].equals("w") ? "white" : "black");
-            response.put("message", "Move undone");
             response.put("gameStatus", "normal");
         } else {
             response.put("success", false);
@@ -239,19 +235,7 @@ public class ChessController {
         return ResponseEntity.ok(response);
     }
 
-    private List<String> parseLegalMovesFromOutput(String output) {
-        List<String> moves = new ArrayList<>();
-        for (String line : output.split("\\n")) {
-            if (line.startsWith("Legal moves: ")) {
-                String movesStr = line.substring("Legal moves: ".length()).trim();
-                if (!movesStr.isEmpty()) {
-                    moves.addAll(Arrays.asList(movesStr.split(" ")));
-                }
-                break;
-            }
-        }
-        return moves;
-    }
+    // ===== Helper methods =====
 
     private String indexToAlgebraic(int row, int col) {
         char file = (char) ('a' + col);
@@ -266,7 +250,7 @@ public class ChessController {
         for (String line : output.split("\\n")) {
             if (line.startsWith("Legal moves: ")) {
                 String legalMovesStr = line.substring("Legal moves: ".length());
-                return Arrays.asList(legalMovesStr.split(" "));
+                return Arrays.asList(legalMovesStr.trim().split(" "));
             }
         }
         return Collections.emptyList();

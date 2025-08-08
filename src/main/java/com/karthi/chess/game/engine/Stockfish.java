@@ -10,7 +10,16 @@ public class Stockfish {
     private Process engineProcess;
     private BufferedReader processReader;
     private BufferedWriter processWriter;
-    private final String enginePath = "./stockfish/stockfish.exe";  // Adjust path for deployment!
+    private final String enginePath;
+
+    public Stockfish() {
+        // Since Stockfish is in PATH, we can call it directly
+        this.enginePath = "stockfish";
+    }
+
+    public Stockfish(String enginePath) {
+        this.enginePath = enginePath;
+    }
 
     public boolean startEngine() {
         try {
