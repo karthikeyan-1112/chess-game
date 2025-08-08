@@ -159,45 +159,55 @@ public class ChessController {
     }
 
     @PostMapping("/valid-moves")
-    public Map<String, Object> getValidMoves(@RequestBody Map<String, Integer> input) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            int row = input.get("row");
-            int col = input.get("col");
+public Map<String, Object> getValidMoves(@RequestBody Map<String, Integer> input) {
+    Map<String, Object> response = new HashMap<>();
+    try {
+        int row = input.get("row");
+        int col = input.get("col");
 
-            String sourceSquare = indexToAlgebraic(row, col);
-            List<Map<String, Integer>> validMovesList = new ArrayList<>();
+        String sourceSquare = "" + (char) ('a' + col) + (8 - row);
+        System.out.println("DEBUG: Requested valid moves for " + sourceSquare + " from row=" + row + " col=" + col);
 
-            Stockfish sf = new Stockfish();
-            if (!sf.startEngine()) {
-                response.put("success", false);
-                response.put("message", "Failed to start Stockfish");
-                return response;
-            }
+        List<Map<String, Integer>> validMovesList = new ArrayList<>();
 
-            List<String> allMoves = getLegalMoves(currentFen, sf);
-            for (String move : allMoves) {
-                if (move.startsWith(sourceSquare)) {
-                    int destCol = move.charAt(2) - 'a';
-                    int destRow = 8 - Character.getNumericValue(move.charAt(3));
-                    Map<String, Integer> mv = new HashMap<>();
-                    mv.put("row", destRow);
-                    mv.put("col", destCol);
-                    validMovesList.add(mv);
-                }
-            }
-            sf.stopEngine();
-
-            response.put("success", true);
-            response.put("validMoves", validMovesList);
-
-        } catch (Exception e) {
-            e.printStackTrace();
+        Stockfish sf = new Stockfish();
+        if (!sf.startEngine()) {
             response.put("success", false);
-            response.put("message", e.getMessage());
+            response.put("message", "Failed to start Stockfish");
+            return response;
         }
-        return response;
+
+        // Get all legal moves from Stockfish
+        List<String> allMoves = getLegalMoves(currentFen, sf);
+
+        // Debug log Stockfish output
+        System.out.println("DEBUG: Stockfish legal moves: " + allMoves);
+
+        // Filter only moves for the clicked piece
+        for (String move : allMoves) {
+            if (move.startsWith(sourceSquare)) {
+                int destCol = move.charAt(2) - 'a';
+                int destRow = 8 - Character.getNumericValue(move.charAt(3));
+                Map<String, Integer> mv = new HashMap<>();
+                mv.put("row", destRow);
+                mv.put("col", destCol);
+                validMovesList.add(mv);
+            }
+        }
+
+        sf.stopEngine();
+
+        response.put("success", true);
+        response.put("validMoves", validMovesList);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        response.put("success", false);
+        response.put("message", e.getMessage());
     }
+    return response;
+}
+
 
     @PostMapping("/reset")
     public Map<String, Object> resetGame() {

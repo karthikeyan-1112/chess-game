@@ -469,13 +469,17 @@ function renderBoard(boardData) {
 
 
 function loadBoard() {
- fetch('/board')
-  .then(r => r.json())
-  .then(data => {
-    boardState = data.board;       
-    renderBoard(boardState);
-  });
-
+  fetch('/board')
+    .then(r => r.json())
+    .then(data => {
+      boardState = data.board;
+      currentTurn = data.currentTurn;   //  Update turn
+      moveHistory = data.moveHistory || [];  //  Sync move history
+      updateMoveHistory();
+      updateStatus(`${capitalize(currentTurn)} to move`);  //  Update status bar
+      renderBoard(boardState);  // Re-render the board
+    })
+    .catch(err => console.error("Error loading board:", err));
 }
 
 function fetchValidMoves(row, col) {
@@ -503,26 +507,33 @@ function sendMove(move) {
   })
   .then(r => r.json())
   .then(res => {
-    if (res.success) {
-      currentTurn = res.currentTurn;
-      lastMove = {
-        fromRow: move.fromRow,
-        fromCol: move.fromCol,
-        toRow: move.toRow,
-        toCol: move.toCol
-      };
-      selected = null;
-      validMoves = [];
-      moveHistory = res.moveHistory || moveHistory;
-      updateMoveHistory();
-      handleGameStatus(res.gameStatus);
-      loadBoard();
-      if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
-        setTimeout(makeBotMove, 600);
-      }
-    } else {
-      alert(res.message);
-    }
+   if (res.success) {
+  currentTurn = res.currentTurn;
+  lastMove = {
+    fromRow: move.fromRow,
+    fromCol: move.fromCol,
+    toRow: move.toRow,
+    toCol: move.toCol
+  };
+  selected = null;
+  validMoves = [];
+  moveHistory = res.moveHistory || [];
+  updateMoveHistory();
+  handleGameStatus(res.gameStatus);
+
+  // Directly render from backend response
+  if (res.board) {
+    renderBoard(res.board);
+  } else {
+    loadBoard();
+  }
+
+  if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
+    setTimeout(makeBotMove, 600);
+  }
+} else {
+  alert(res.message);
+}
   });
 }
 
