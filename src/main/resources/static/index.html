@@ -473,7 +473,7 @@ function loadBoard() {
     .then(r => r.json())
     .then(data => {
       boardState = data.board;
-      currentTurn = data.currentTurn;   //  Update turn
+      currentTurn = data.currentTurn;   // move Update turn
       moveHistory = data.moveHistory || [];  //  Sync move history
       updateMoveHistory();
       updateStatus(`${capitalize(currentTurn)} to move`);  //  Update status bar
@@ -502,62 +502,72 @@ function sendMove(move) {
   hidePromotion();
   fetch('/move', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(move)
   })
   .then(r => r.json())
   .then(res => {
-   if (res.success) {
-  currentTurn = res.currentTurn;
-  lastMove = {
-    fromRow: move.fromRow,
-    fromCol: move.fromCol,
-    toRow: move.toRow,
-    toCol: move.toCol
-  };
-  selected = null;
-  validMoves = [];
-  moveHistory = res.moveHistory || [];
-  updateMoveHistory();
-  handleGameStatus(res.gameStatus);
+    if (res.success) {
+      currentTurn = res.currentTurn;
+      lastMove = {
+        fromRow: move.fromRow,
+        fromCol: move.fromCol,
+        toRow: move.toRow,
+        toCol: move.toCol
+      };
+      selected = null;
+      validMoves = [];
+      moveHistory = res.moveHistory || [];
+      updateMoveHistory();
+      updateStatus(`${capitalize(currentTurn)} to move`); // ✅ updates turn text
+      handleGameStatus(res.gameStatus);
 
-  // Directly render from backend response
-  if (res.board) {
-    renderBoard(res.board);
-  } else {
-    loadBoard();
-  }
+      // ✅ Render directly from backend response
+      if (res.board) {
+        renderBoard(res.board);
+      } else {
+        loadBoard();
+      }
 
-  if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
-    setTimeout(makeBotMove, 600);
-  }
-} else {
-  alert(res.message);
-}
+      // Bot move if required
+      if (gameMode === 'bot' && currentTurn !== playerSide && !gameOver) {
+        setTimeout(makeBotMove, 600);
+      }
+    } else {
+      alert(res.message);
+    }
   });
 }
 
 
 function makeBotMove() {
   if (gameOver) return;
+
   fetch('/bot-move', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({color: currentTurn})
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ color: currentTurn })
   })
-    .then(r => r.json())
-    .then(res => {
-      if (res.success) {
-        lastMove = parseMoveString(res.move);
-        currentTurn = res.currentTurn;
-        moveHistory = res.moveHistory || moveHistory;
-        updateMoveHistory();
-        handleGameStatus(res.gameStatus);
-        loadBoard();
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      // No need for parseMoveString since backend returns full board
+      currentTurn = res.currentTurn;
+      moveHistory = res.moveHistory || moveHistory;
+      updateMoveHistory();
+      updateStatus(`${capitalize(currentTurn)} to move`); // ✅ update turn indicator
+      handleGameStatus(res.gameStatus);
+
+      // ✅ Render board directly from response
+      if (res.board) {
+        renderBoard(res.board);
       } else {
-        alert(res.message);
+        loadBoard();
       }
-    });
+    } else {
+      alert(res.message);
+    }
+  });
 }
 
 function parseMoveString(str) {
