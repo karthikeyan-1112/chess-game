@@ -1,5 +1,6 @@
 package com.karthi.chess.game.Controller;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +42,8 @@ public class ChessController implements InitializingBean {
         @SuppressWarnings("unchecked")
         Map<String, Object>[][] boardState = (Map<String, Object>[][]) new HashMap[8][8];
         for (Square square : Square.values()) {
-            if (square.ordinal() >= 64) continue;
+            if (square.ordinal() >= 64)
+                continue;
 
             int row = 7 - square.getRank().ordinal();
             int col = square.getFile().ordinal();
@@ -82,11 +84,9 @@ public class ChessController implements InitializingBean {
             }
 
             Square from = Square.valueOf(
-                String.format("%c%d", (char) ('a' + fromCol), 8 - fromRow).toUpperCase()
-            );
+                    String.format("%c%d", (char) ('a' + fromCol), 8 - fromRow).toUpperCase());
             Square to = Square.valueOf(
-                String.format("%c%d", (char) ('a' + toCol), 8 - toRow).toUpperCase()
-            );
+                    String.format("%c%d", (char) ('a' + toCol), 8 - toRow).toUpperCase());
 
             Move move;
             // Handle Promotion
@@ -144,64 +144,63 @@ public class ChessController implements InitializingBean {
         }
     }
 
-   @PostMapping("/bot-move")
-public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
-    Map<String, Object> res = new HashMap<>();
-    try {
-        String fen = board.getFen(); // Current position
-        StockfishClient sf = new StockfishClient("stockfish"); // or full path if needed
-        sf.start();
-        String bestMoveStr = sf.getBestMove(fen);
-        sf.stop();
+    @PostMapping("/bot-move")
+    public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, String> request) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            String fen = board.getFen(); // Current position
+            StockfishClient sf = new StockfishClient("stockfish"); // or full path if needed
+            sf.start();
+            String bestMoveStr = sf.getBestMove(fen);
+            sf.stop();
 
-        if (bestMoveStr != null && bestMoveStr.length() >= 4) {
-            Square from = Square.valueOf(bestMoveStr.substring(0, 2).toUpperCase());
-            Square to = Square.valueOf(bestMoveStr.substring(2, 4).toUpperCase());
-            Move move;
+            if (bestMoveStr != null && bestMoveStr.length() >= 4) {
+                Square from = Square.valueOf(bestMoveStr.substring(0, 2).toUpperCase());
+                Square to = Square.valueOf(bestMoveStr.substring(2, 4).toUpperCase());
+                Move move;
 
-            // Promotion handling
-            if (bestMoveStr.length() == 5) {
-                char promoChar = bestMoveStr.charAt(4);
-                PieceType promoType = switch (promoChar) {
-                    case 'q' -> PieceType.QUEEN;
-                    case 'r' -> PieceType.ROOK;
-                    case 'b' -> PieceType.BISHOP;
-                    case 'n' -> PieceType.KNIGHT;
-                    default -> null;
-                };
-                if (promoType != null) {
-                    Piece fromPiece = board.getPiece(from);
-                    move = new Move(from, to, Piece.make(fromPiece.getPieceSide(), promoType));
+                // Promotion handling
+                if (bestMoveStr.length() == 5) {
+                    char promoChar = bestMoveStr.charAt(4);
+                    PieceType promoType = switch (promoChar) {
+                        case 'q' -> PieceType.QUEEN;
+                        case 'r' -> PieceType.ROOK;
+                        case 'b' -> PieceType.BISHOP;
+                        case 'n' -> PieceType.KNIGHT;
+                        default -> null;
+                    };
+                    if (promoType != null) {
+                        Piece fromPiece = board.getPiece(from);
+                        move = new Move(from, to, Piece.make(fromPiece.getPieceSide(), promoType));
+                    } else {
+                        move = new Move(from, to);
+                    }
                 } else {
                     move = new Move(from, to);
                 }
-            } else {
-                move = new Move(from, to);
-            }
 
-            if (board.isMoveLegal(move, true)) {
-                board.doMove(move);
-                moveHistory.add(move.toString());
-                res.put("success", true);
-                res.put("move", move.toString());
-                res.put("moveHistory", new ArrayList<>(moveHistory));
-                res.put("currentTurn", board.getSideToMove().toString().toLowerCase());
-                res.put("gameStatus", getCurrentGameStatus());
+                if (board.isMoveLegal(move, true)) {
+                    board.doMove(move);
+                    moveHistory.add(move.toString());
+                    res.put("success", true);
+                    res.put("move", move.toString());
+                    res.put("moveHistory", new ArrayList<>(moveHistory));
+                    res.put("currentTurn", board.getSideToMove().toString().toLowerCase());
+                    res.put("gameStatus", getCurrentGameStatus());
+                } else {
+                    res.put("success", false);
+                    res.put("message", "Illegal move returned by Stockfish");
+                }
             } else {
                 res.put("success", false);
-                res.put("message", "Illegal move returned by Stockfish");
+                res.put("message", "No valid move found");
             }
-        } else {
+        } catch (IOException | InterruptedException e) {
             res.put("success", false);
-            res.put("message", "No valid move found");
+            res.put("message", "Error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        res.put("success", false);
-        res.put("message", "Error: " + e.getMessage());
+        return ResponseEntity.ok(res);
     }
-    return ResponseEntity.ok(res);
-}
-
 
     @PostMapping("/valid-moves")
     public ResponseEntity<Map<String, Object>> getValidMoves(@RequestBody Map<String, Integer> input) {
@@ -251,8 +250,8 @@ public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, Stri
     private String getCurrentGameStatus() {
         if (board.isMated()) {
             return board.isKingAttacked()
-                ? "checkmate-" + (board.getSideToMove() == Side.WHITE ? "black" : "white")
-                : "stalemate";
+                    ? "checkmate-" + (board.getSideToMove() == Side.WHITE ? "black" : "white")
+                    : "stalemate";
         }
         if (board.isDraw()) {
             return "draw";
