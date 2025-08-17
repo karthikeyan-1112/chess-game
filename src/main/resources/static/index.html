@@ -366,8 +366,8 @@
 </body>
 
 
-    <script>
-  // Get references to DOM elements
+<script>
+  // ======== DOM refs ========
   const modeSelectGroup = document.getElementById("modeSelectGroup");
   const pvpBtn = document.getElementById("pvpBtn");
   const pvbBtn = document.getElementById("pvbBtn");
@@ -379,165 +379,430 @@
   const chessboard = document.getElementById("chessboard");
   const promotionPopup = document.getElementById("promotionPopup");
 
-  // Eliminated pieces + points panels
+  // Eliminated + points UI
   const eliminatedWhiteEl = document.getElementById("eliminatedWhite");
   const eliminatedBlackEl = document.getElementById("eliminatedBlack");
   const pointsWhiteEl = document.getElementById("pointsWhite");
   const pointsBlackEl = document.getElementById("pointsBlack");
 
-  // Track eliminated pieces & points
-  let eliminatedPieces = { white: [], black: [] };
-  let points = { white: 0, black: 0 };
-
-  // Standard chess piece values
-  const pieceValues = {
-    PAWN: 1,
-    KNIGHT: 3,
-    BISHOP: 3,
-    ROOK: 5,
-    QUEEN: 9,
-    KING: 0,
-  };
-
-  // Unicode symbols mapping by piece type and color
-  const pieceImgPath = {
-    PAWN: {
-      white: "/chess_piece/White_Pawn.svg",
-      black: "/chess_piece/Black_Pawn.svg",
-    },
-    ROOK: {
-      white: "/chess_piece/White_Rook.svg",
-      black: "/chess_piece/Black_Rook.svg",
-    },
-    KNIGHT: {
-      white: "/chess_piece/White_Knight.svg",
-      black: "/chess_piece/Black_Knight.svg",
-    },
-    BISHOP: {
-      white: "/chess_piece/White_Bishop.svg",
-      black: "/chess_piece/Black_Bishop.svg",
-    },
-    QUEEN: {
-      white: "/chess_piece/White_Queen.svg",
-      black: "/chess_piece/Black_Queen.svg",
-    },
-    KING: {
-      white: "/chess_piece/White_King.svg",
-      black: "/chess_piece/Black_King.svg",
-    },
-  };
-
+  // ======== State ========
   let gameMode = "player"; // 'player' or 'bot'
-  let playerSide = "white"; // chosen side if bot
+  let playerSide = "white";
   let modeConfirmed = false;
   let currentTurn = "white";
-  let selected = null;
+  let selected = null;                // {row,col,color}
+  let validMoves = [];                // [{row,col}]
   let moveHistory = [];
-  let validMoves = [];
-  let lastMove = null;
-  let boardState = null;
+  let lastMove = null;                // {fromRow,fromCol,toRow,toCol}
+  let boardState = null;              // 8x8 array of {type:"PAWN",color:"white"} | null
   let promotionMove = null;
   let gameStarted = false;
   let gameOver = false;
 
-  // ✅ Update eliminated pieces and points
-  function updateEliminatedAndPoints(capturedPiece, capturedColor) {
+  // Eliminated + points tracking
+  let eliminatedPieces = { white: [], black: [] };
+  let points = { white: 0, black: 0 };
+
+  const pieceValues = { PAWN:1, KNIGHT:3, BISHOP:3, ROOK:5, QUEEN:9, KING:0 };
+
+  const pieceImgPath = {
+    PAWN:   { white: "/chess_piece/White_Pawn.svg",   black: "/chess_piece/Black_Pawn.svg" },
+    ROOK:   { white: "/chess_piece/White_Rook.svg",   black: "/chess_piece/Black_Rook.svg" },
+    KNIGHT: { white: "/chess_piece/White_Knight.svg", black: "/chess_piece/Black_Knight.svg" },
+    BISHOP: { white: "/chess_piece/White_Bishop.svg", black: "/chess_piece/Black_Bishop.svg" },
+    QUEEN:  { white: "/chess_piece/White_Queen.svg",  black: "/chess_piece/Black_Queen.svg" },
+    KING:   { white: "/chess_piece/White_King.svg",   black: "/chess_piece/Black_King.svg" },
+  };
+
+  // ======== Helpers ========
+  function capitalize(s){ return s ? s[0].toUpperCase()+s.slice(1) : s; }
+  function deepCloneBoard(b){ return JSON.parse(JSON.stringify(b)); }
+  function getSquareEl(r,c){ return chessboard.querySelector(`.square[data-row="${r}"][data-col="${c}"]`); }
+  function getBoardSquare(r,c){ return boardState?.[r]?.[c] || null; }
+
+  function createPieceImg(piece){
+    const img = document.createElement("img");
+    img.src = pieceImgPath[piece.type][piece.color];
+    img.draggable = gameStarted && !gameOver;
+    img.className = "piece-img";
+    return img;
+  }
+
+  function drawSquarePiece(r,c){
+    const sqEl = getSquareEl(r,c);
+    if(!sqEl) return;
+    // remove existing piece span, keep coords/highlights
+    const old = sqEl.querySelector(".piece");
+    if (old) old.remove();
+
+    const piece = getBoardSquare(r,c);
+    if (piece){
+      const span = document.createElement("span");
+      span.className = "piece " + (piece.color === "white" ? "white-piece" : "black-piece");
+      span.appendChild(createPieceImg(piece));
+      sqEl.appendChild(span);
+    }
+  }
+
+  function clearHighlights(){
+    chessboard.querySelectorAll(".square.selected,.square.valid-move,.square.capture,.square.last-move")
+      .forEach(el => el.classList.remove("selected","valid-move","capture","last-move"));
+  }
+
+  function updateHighlights(){
+    // remove all highlight classes, then add just what's needed
+    clearHighlights();
+
+    if (lastMove){
+      const a = getSquareEl(lastMove.fromRow,lastMove.fromCol);
+      const b = getSquareEl(lastMove.toRow,lastMove.toCol);
+      if (a) a.classList.add("last-move");
+      if (b) b.classList.add("last-move");
+    }
+    if (selected){
+      const sEl = getSquareEl(selected.row,selected.col);
+      if (sEl) sEl.classList.add("selected");
+    }
+    validMoves.forEach(m=>{
+      const tEl = getSquareEl(m.row,m.col);
+      if (!tEl) return;
+      tEl.classList.add("valid-move");
+      if (getBoardSquare(m.row,m.col)) tEl.classList.add("capture");
+    });
+  }
+
+  // ======== Eliminated + Points ========
+  function updateEliminatedAndPoints(capturedPiece, capturedColor){
     if (!capturedPiece) return;
 
-    const symbolMap = {
-      PAWN: "♟",
-      ROOK: "♜",
-      KNIGHT: "♞",
-      BISHOP: "♝",
-      QUEEN: "♛",
-      KING: "♚",
-    };
+    const symbolMap = { PAWN:"♟", ROOK:"♜", KNIGHT:"♞", BISHOP:"♝", QUEEN:"♛", KING:"♚" };
+    const sym = symbolMap[capturedPiece.type] || "?";
+    eliminatedPieces[capturedColor].push(sym);
 
-    const symbol = symbolMap[capturedPiece.type] || "?";
-    eliminatedPieces[capturedColor].push(symbol);
-
-    // Points go to the opponent
     const opponent = capturedColor === "white" ? "black" : "white";
-    points[opponent] += pieceValues[capturedPiece.type];
+    points[opponent] += (pieceValues[capturedPiece.type] || 0);
 
-    // Update UI
     eliminatedWhiteEl.textContent = "⚪ White: " + eliminatedPieces.white.join(" ");
     eliminatedBlackEl.textContent = "⚫ Black: " + eliminatedPieces.black.join(" ");
     pointsWhiteEl.textContent = "⚪ White: " + points.white;
     pointsBlackEl.textContent = "⚫ Black: " + points.black;
   }
 
-  // Update active mode button and side selector visibility
-  function updateModeButtons() {
-    pvpBtn.classList.toggle("active", gameMode === "player");
-    pvbBtn.classList.toggle("active", gameMode === "bot");
-    sideSelect.style.display = gameMode === "bot" ? "block" : "none";
+  // ======== Rendering ========
+  function renderBoard(boardData){
+    // one-time build of all 64 squares (and when resetting)
+    chessboard.innerHTML = "";
+    for (let r=0;r<8;r++){
+      for (let c=0;c<8;c++){
+        const sq = document.createElement("div");
+        const isLight = (r+c)%2===0;
+        sq.className = "square " + (isLight ? "white" : "black");
+        sq.dataset.row = r;
+        sq.dataset.col = c;
+        if (r === 7) sq.setAttribute("data-coord-col", String.fromCharCode(97 + c));
+        if (c === 0) sq.setAttribute("data-coord-row", 8 - r);
+
+        const piece = boardData[r][c];
+        if (piece){
+          const span = document.createElement("span");
+          span.className = "piece " + (piece.color==="white"?"white-piece":"black-piece");
+          span.appendChild(createPieceImg(piece));
+          sq.appendChild(span);
+        }
+
+        sq.addEventListener("click", ()=>handleSquareClick(r,c));
+        sq.addEventListener("dragover", e=>e.preventDefault());
+        sq.addEventListener("drop", e=>{ e.preventDefault(); handleDrop(r,c); });
+
+        chessboard.appendChild(sq);
+      }
+    }
+    updateHighlights();
   }
 
-  // Mode buttons handlers
-  pvpBtn.onclick = () => {
-    gameMode = "player";
-    updateModeButtons();
-  };
-  pvbBtn.onclick = () => {
-    gameMode = "bot";
-    updateModeButtons();
-  };
-  sideSelect.onchange = () => {
-    playerSide = sideSelect.value;
-  };
+  // Only update the two squares for a move (no full re-render)
+  function applyMoveLocally(fromRow,fromCol,toRow,toCol){
+    const movingPiece = getBoardSquare(fromRow,fromCol);
+    const captured = getBoardSquare(toRow,toCol) || null;
 
-  // Capitalize helper
-  function capitalize(s) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
+    // DOM: clear target if capture
+    if (captured){
+      updateEliminatedAndPoints(captured, captured.color);
+    }
+
+    // State:
+    boardState[toRow][toCol]   = movingPiece ? {...movingPiece} : null;
+    boardState[fromRow][fromCol] = null;
+
+    // DOM: update just two squares
+    drawSquarePiece(fromRow,fromCol);
+    drawSquarePiece(toRow,toCol);
+
+    lastMove = { fromRow,fromCol,toRow,toCol };
+    updateHighlights();
+
+    return captured;
   }
 
-  // Confirm button to start game and hide mode selection
-  confirmBtn.onclick = () => {
+  // ======== Status / history ========
+  function updateStatus(msg){ statusBar.innerHTML = msg || ""; }
+  function updateMoveHistory(){
+    let html = "";
+    for (let i=0; i<moveHistory.length; i+=2){
+      const n = i/2+1, w = moveHistory[i]||"", b = moveHistory[i+1]||"";
+      html += `<span>${n}. ${w} ${b}</span> `;
+    }
+    historyPanel.innerHTML = html.trim();
+  }
+
+  // ======== Network ========
+  function loadBoard(){
+    // Called at init and reset (full draw)
+    fetch("/board")
+      .then(r=>r.json())
+      .then(data=>{
+        boardState = data;
+        renderBoard(boardState);
+      });
+  }
+
+  function fetchValidMoves(row,col){
+    fetch("/valid-moves",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({row,col}),
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if (res.success){
+        validMoves = res.validMoves;
+        // ✅ only update highlights, no full re-render
+        updateHighlights();
+      }
+    });
+  }
+
+  function sendMove(move){
+    // move: {fromRow,fromCol,toRow,toCol,color, [promotion]}
+    const prevBoard = deepCloneBoard(boardState);
+
+    hidePromotion();
+    fetch("/move",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(move),
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if (!res.success) return alert(res.message || "Illegal move");
+
+      // capture handling (prefer backend hint; otherwise detect locally)
+      let capturedPiece = res.capturedPiece || prevBoard[move.toRow][move.toCol] || null;
+
+      // apply locally
+      applyMoveLocally(move.fromRow, move.fromCol, move.toRow, move.toCol);
+
+      // If backend provided a *different* capturedPiece object (e.g., includes type/color),
+      // ensure UI points list is correct (avoid double-add by not calling twice).
+      if (res.capturedPiece && !prevBoard[move.toRow][move.toCol]){
+        // We already updated via local detection if there was a piece present.
+        // If local didn't see it (e.g., en passant), add now:
+        updateEliminatedAndPoints(res.capturedPiece, res.capturedPiece.color);
+      }
+
+      currentTurn = res.currentTurn;
+      selected = null;
+      validMoves = [];
+      moveHistory = res.moveHistory || moveHistory;
+      updateMoveHistory();
+      handleGameStatus(res.gameStatus);
+
+      if (gameMode === "bot" && currentTurn !== playerSide && !gameOver){
+        setTimeout(makeBotMove, 500);
+      } else {
+        updateStatus(`${capitalize(currentTurn)} to move`);
+      }
+    })
+    .catch(()=>alert("Error communicating with server."));
+  }
+
+  function makeBotMove(){
+    if (gameOver) return;
+    fetch("/bot-move",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ color: currentTurn }),
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if (!res.success) return alert(res.message || "Bot move failed");
+
+      // Parse bot move like "e2e4"
+      const mv = parseMoveString(res.move);
+      if (!mv) return;
+
+      // capture detection: look at current boardState target before applying
+      const capturedBefore = getBoardSquare(mv.toRow, mv.toCol);
+
+      // apply locally
+      applyMoveLocally(mv.fromRow, mv.fromCol, mv.toRow, mv.toCol);
+
+      // if backend says capturedPiece (e.g., en passant), ensure accounting
+      if (res.capturedPiece && !capturedBefore){
+        updateEliminatedAndPoints(res.capturedPiece, res.capturedPiece.color);
+      }
+
+      currentTurn = res.currentTurn;
+      moveHistory = res.moveHistory || moveHistory;
+      updateMoveHistory();
+      handleGameStatus(res.gameStatus);
+      updateStatus(`${capitalize(currentTurn)} to move`);
+    });
+  }
+
+  function parseMoveString(str){
+    if (!str || str.length < 4) return null;
+    const fromCol = str.charCodeAt(0)-97;
+    const fromRow = 8 - +str[1];
+    const toCol   = str.charCodeAt(2)-97;
+    const toRow   = 8 - +str[3];
+    return { fromRow, fromCol, toRow, toCol };
+  }
+
+  // ======== Interaction ========
+  function handleSquareClick(row,col){
+    if (!gameStarted || gameOver) return;
+    const sq = getBoardSquare(row,col);
+    if (!selected){
+      if (!sq) return;
+      if (gameMode==="bot" && sq.color !== playerSide) return;
+      if (sq.color !== currentTurn) return;
+      selected = { row, col, color: sq.color };
+      fetchValidMoves(row,col);
+      updateHighlights();
+      return;
+    }
+
+    // clicked same square → deselect
+    if (selected.row===row && selected.col===col){
+      selected = null;
+      validMoves = [];
+      updateHighlights();
+      return;
+    }
+
+    // Attempt move if (row,col) is valid
+    if (validMoves.some(m=>m.row===row && m.col===col)){
+      const promotionNeeded =
+        (selected.color==="white" && row===0) ||
+        (selected.color==="black" && row===7);
+
+      if (promotionNeeded && getBoardSquare(selected.row,selected.col).type==="PAWN"){
+        promotionMove = { fromRow:selected.row, fromCol:selected.col, toRow:row, toCol:col, color:selected.color };
+        showPromotion();
+      } else {
+        sendMove({ fromRow:selected.row, fromCol:selected.col, toRow:row, toCol:col, color:selected.color });
+      }
+    } else {
+      // clicked elsewhere → reset selection
+      selected = null;
+      validMoves = [];
+      updateHighlights();
+    }
+  }
+
+  function handleDrop(row,col){
+    if (!selected) return;
+    const piece = getBoardSquare(selected.row, selected.col);
+    if (!piece) return;
+    if (validMoves.some(m=>m.row===row && m.col===col)){
+      const promotionRequired =
+        (piece.color==="white" && row===0) ||
+        (piece.color==="black" && row===7);
+      if (promotionRequired && piece.type==="PAWN"){
+        promotionMove = { fromRow:selected.row, fromCol:selected.col, toRow:row, toCol:col, color:piece.color };
+        showPromotion();
+      } else {
+        sendMove({ fromRow:selected.row, fromCol:selected.col, toRow:row, toCol:col, color:piece.color });
+      }
+    }
+  }
+
+  // ======== Promotion ========
+  function hidePromotion(){ promotionPopup.style.display = "none"; promotionMove = null; }
+  function showPromotion(){ promotionPopup.style.display = "flex"; }
+
+  promotionPopup.querySelectorAll(".promotion-btn").forEach(btn=>{
+    btn.onclick = ()=>{
+      if (!promotionMove) return;
+      promotionMove.promotion = btn.dataset.piece; // "queen","rook","bishop","knight"
+      sendMove(promotionMove);
+      hidePromotion();
+    };
+  });
+
+  // ======== Status ========
+  function handleGameStatus(status){
+    if (!status){ updateStatus(`${capitalize(currentTurn)} to move`); return; }
+    if (status.startsWith("checkmate")){
+      gameOver = true;
+      const winner = status.includes("white") ? "White" : "Black";
+      updateStatus(`${winner} wins by checkmate!`);
+    } else if (status === "stalemate"){
+      gameOver = true; updateStatus("Game drawn by stalemate.");
+    } else if (status === "draw"){
+      gameOver = true; updateStatus("Game drawn.");
+    } else if (status.startsWith("check")){
+      updateStatus("Check!");
+    } else {
+      gameOver = false; updateStatus(`${capitalize(currentTurn)} to move`);
+    }
+  }
+
+  // ======== Mode / Reset ========
+  function updateModeButtons(){
+    pvpBtn.classList.toggle("active", gameMode==="player");
+    pvbBtn.classList.toggle("active", gameMode==="bot");
+    sideSelect.style.display = gameMode==="bot" ? "block" : "none";
+  }
+
+  pvpBtn.onclick = ()=>{ gameMode="player"; updateModeButtons(); };
+  pvbBtn.onclick = ()=>{ gameMode="bot";    updateModeButtons(); };
+  sideSelect.onchange = ()=>{ playerSide = sideSelect.value; };
+
+  confirmBtn.onclick = ()=>{
     modeConfirmed = true;
     modeSelectGroup.style.display = "none";
 
-    resetGame().then((success) => {
+    resetGame().then(success=>{
       if (!success) return;
-
-      gameStarted = true;
-      gameOver = false;
-
+      gameStarted = true; gameOver = false;
       updateStatus(`${capitalize(currentTurn)} to move`);
-
-      if (gameMode === "bot") {
-        sideSelect.style.display = "block";
-        if (playerSide === "black" && currentTurn === "white") {
-          makeBotMove();
-        }
+      if (gameMode==="bot"){
+        sideSelect.style.display="block";
+        if (playerSide==="black" && currentTurn==="white") makeBotMove();
       } else {
-        sideSelect.style.display = "none";
+        sideSelect.style.display="none";
       }
     });
 
-    // Show stats panel
+    // show stats panel
     document.getElementById("gameStats").style.display = "block";
   };
 
-  // Reset button resets game and shows mode selector again
-  resetBtn.onclick = () => {
-    resetGame().then((success) => {
+  resetBtn.onclick = ()=>{
+    resetGame().then(success=>{
       if (!success) return;
-
-      modeConfirmed = false;
-      gameStarted = false;
-      gameOver = false;
+      modeConfirmed=false; gameStarted=false; gameOver=false;
 
       modeSelectGroup.style.display = "";
       sideSelect.style.display = "none";
-
       updateStatus("Select mode and click Confirm to start");
-      moveHistory = [];
-      updateMoveHistory();
+      moveHistory=[]; updateMoveHistory();
 
-      // Reset stats
-      eliminatedPieces = { white: [], black: [] };
-      points = { white: 0, black: 0 };
+      // reset eliminated + points
+      eliminatedPieces = { white:[], black:[] };
+      points = { white:0, black:0 };
       eliminatedWhiteEl.textContent = "⚪ White: ";
       eliminatedBlackEl.textContent = "⚫ Black: ";
       pointsWhiteEl.textContent = "⚪ White: 0";
@@ -547,329 +812,32 @@
     });
   };
 
-  function updateStatus(msg) {
-    statusBar.innerHTML = msg || "";
-  }
-
-  function updateMoveHistory() {
-    let html = "";
-    for (let i = 0; i < moveHistory.length; i += 2) {
-      const moveNumber = i / 2 + 1;
-      const whiteMove = moveHistory[i] || "";
-      const blackMove = moveHistory[i + 1] || "";
-      html += `<span>${moveNumber}. ${whiteMove} ${blackMove}</span> `;
-    }
-    historyPanel.innerHTML = html.trim();
-  }
-
-  function getBoardSquare(row, col) {
-    return boardState?.[row]?.[col];
-  }
-
-  function renderBoard(boardData) {
-    chessboard.innerHTML = "";
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const sq = document.createElement("div");
-        const isLight = (r + c) % 2 === 0;
-        sq.className = "square " + (isLight ? "white" : "black");
-        sq.dataset.row = r;
-        sq.dataset.col = c;
-
-        if (r === 7) sq.setAttribute("data-coord-col", String.fromCharCode(97 + c));
-        if (c === 0) sq.setAttribute("data-coord-row", 8 - r);
-
-        if (
-          lastMove &&
-          ((r === lastMove.fromRow && c === lastMove.fromCol) ||
-            (r === lastMove.toRow && c === lastMove.toCol))
-        ) {
-          sq.classList.add("last-move");
-        }
-
-        const piece = boardData[r][c];
-        if (piece) {
-          const pieceSpan = document.createElement("span");
-          pieceSpan.className =
-            "piece " + (piece.color === "white" ? "white-piece" : "black-piece");
-
-          const img = document.createElement("img");
-          img.src = pieceImgPath[piece.type][piece.color];
-          img.draggable = gameStarted && !gameOver;
-          img.className = "piece-img";
-
-          pieceSpan.appendChild(img);
-          sq.appendChild(pieceSpan);
-        }
-
-        if (selected && selected.row === r && selected.col === c) {
-          sq.classList.add("selected");
-        }
-        if (validMoves.some((m) => m.row === r && m.col === c)) {
-          sq.classList.add("valid-move");
-          if (piece) {
-            sq.classList.add("capture");
-          }
-        }
-
-        sq.addEventListener("click", () => handleSquareClick(r, c));
-        sq.addEventListener("dragover", (e) => e.preventDefault());
-        sq.addEventListener("drop", (e) => {
-          e.preventDefault();
-          handleDrop(r, c);
-        });
-
-        chessboard.appendChild(sq);
-      }
-    }
-  }
-
-  function loadBoard() {
-    fetch("/board")
-      .then((r) => r.json())
-      .then((data) => {
-        boardState = data;
-        renderBoard(data);
-      });
-  }
-
-  function fetchValidMoves(row, col) {
-    fetch("/valid-moves", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ row, col }),
-    })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success) {
-          validMoves = res.validMoves;
-          renderBoard(boardState);
-        }
-      });
-  }
-
-  function sendMove(move) {
-    hidePromotion();
-    fetch("/move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(move),
-    })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success) {
-          // ✅ Capture handling
-          if (res.capturedPiece) {
-            updateEliminatedAndPoints(res.capturedPiece, res.capturedPiece.color);
-          }
-
-          currentTurn = res.currentTurn;
-          lastMove = {
-            fromRow: move.fromRow,
-            fromCol: move.fromCol,
-            toRow: move.toRow,
-            toCol: move.toCol,
-          };
-          selected = null;
-          validMoves = [];
-          moveHistory = res.moveHistory || moveHistory;
-          boardState = null;
+  function resetGame(){
+    return fetch("/reset",{ method:"POST" })
+      .then(r=>r.json())
+      .then(res=>{
+        if (res.success){
+          currentTurn="white";
+          selected=null; validMoves=[]; lastMove=null;
+          boardState=null; gameStarted=false; gameOver=false;
           updateMoveHistory();
-          handleGameStatus(res.gameStatus);
-          loadBoard();
-          if (
-            gameMode === "bot" &&
-            currentTurn !== playerSide &&
-            !gameOver
-          ) {
-            setTimeout(makeBotMove, 600);
-          }
-        } else {
-          alert(res.message);
-        }
-      })
-      .catch(() => alert("Error communicating with server."));
-  }
-
-  function makeBotMove() {
-    if (gameOver) return;
-    fetch("/bot-move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ color: currentTurn }),
-    })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success) {
-          if (res.capturedPiece) {
-            updateEliminatedAndPoints(res.capturedPiece, res.capturedPiece.color);
-          }
-
-          lastMove = parseMoveString(res.move);
-          currentTurn = res.currentTurn;
-          moveHistory = res.moveHistory || moveHistory;
-          updateMoveHistory();
-          handleGameStatus(res.gameStatus);
-          loadBoard();
-        } else {
-          alert(res.message);
-        }
-      });
-  }
-
-  function parseMoveString(str) {
-    if (!str || str.length < 4) return null;
-    const fromCol = str.charCodeAt(0) - 97;
-    const fromRow = 8 - +str[1];
-    const toCol = str.charCodeAt(2) - 97;
-    const toRow = 8 - +str[3];
-    return { fromRow, fromCol, toRow, toCol };
-  }
-
-  function handleSquareClick(row, col) {
-    if (!gameStarted || gameOver) return;
-    const sq = getBoardSquare(row, col);
-    if (!selected) {
-      if (!sq) return;
-      if (gameMode === "bot" && sq.color !== playerSide) return;
-      if (sq.color !== currentTurn) return;
-      selected = { row, col, color: sq.color };
-      fetchValidMoves(row, col);
-    } else {
-      if (selected.row === row && selected.col === col) {
-        selected = null;
-        validMoves = [];
-        renderBoard(boardState);
-        return;
-      }
-      if (validMoves.some((m) => m.row === row && m.col === col)) {
-        const promotionNeeded =
-          (selected.color === "white" && row === 0) ||
-          (selected.color === "black" && row === 7);
-        if (
-          promotionNeeded &&
-          getBoardSquare(selected.row, selected.col).type === "PAWN"
-        ) {
-          promotionMove = {
-            fromRow: selected.row,
-            fromCol: selected.col,
-            toRow: row,
-            toCol: col,
-            color: selected.color,
-          };
-          showPromotion();
-        } else {
-          sendMove({
-            fromRow: selected.row,
-            fromCol: selected.col,
-            toRow: row,
-            toCol: col,
-            color: selected.color,
-          });
-        }
-      } else {
-        selected = null;
-        validMoves = [];
-        renderBoard(boardState);
-      }
-    }
-  }
-
-  function handleDrop(row, col) {
-    if (!selected) return;
-    const pawn = getBoardSquare(selected.row, selected.col);
-    if (!pawn) return;
-    if (validMoves.some((m) => m.row === row && m.col === col)) {
-      const promotionRequired =
-        (pawn.color === "white" && row === 0) ||
-        (pawn.color === "black" && row === 7);
-      if (promotionRequired && pawn.type === "PAWN") {
-        promotionMove = {
-          fromRow: selected.row,
-          fromCol: selected.col,
-          toRow: row,
-          toCol: col,
-          color: pawn.color,
-        };
-        showPromotion();
-      } else {
-        sendMove({
-          fromRow: selected.row,
-          fromCol: selected.col,
-          toRow: row,
-          toCol: col,
-          color: pawn.color,
-        });
-      }
-    }
-  }
-
-  function hidePromotion() {
-    promotionPopup.style.display = "none";
-    promotionMove = null;
-  }
-
-  function showPromotion() {
-    promotionPopup.style.display = "flex";
-  }
-
-  promotionPopup.querySelectorAll(".promotion-btn").forEach((btn) => {
-    btn.onclick = () => {
-      if (!promotionMove) return;
-      promotionMove.promotion = btn.dataset.piece;
-      sendMove(promotionMove);
-      hidePromotion();
-    };
-  });
-
-  function handleGameStatus(status) {
-    if (status.startsWith("checkmate")) {
-      gameOver = true;
-      const winner = status.includes("white") ? "White" : "Black";
-      updateStatus(`${winner} wins by checkmate!`);
-    } else if (status === "stalemate") {
-      gameOver = true;
-      updateStatus("Game drawn by stalemate.");
-    } else if (status === "draw") {
-      gameOver = true;
-      updateStatus("Game drawn.");
-    } else if (status.startsWith("check")) {
-      updateStatus("Check!");
-    } else {
-      gameOver = false;
-      updateStatus(`${capitalize(currentTurn)} to move`);
-    }
-  }
-
-  function resetGame() {
-    return fetch("/reset", { method: "POST" })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success) {
-          currentTurn = "white";
-          selected = null;
-          moveHistory = [];
-          validMoves = [];
-          lastMove = null;
-          boardState = null;
-          gameStarted = false;
-          gameOver = false;
-          updateMoveHistory();
-          loadBoard();
+          loadBoard(); // full render (only at reset)
           return true;
         }
         return false;
       });
   }
 
-  window.onload = () => {
+  // ======== Init ========
+  window.onload = ()=>{
     updateModeButtons();
     modeSelectGroup.style.display = "";
     sideSelect.style.display = "none";
     updateStatus("Select mode and click Confirm to start");
-    loadBoard();
+    loadBoard(); // initial full render only
   };
 </script>
+
 
   </body>
 </html>
