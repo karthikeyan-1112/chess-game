@@ -279,7 +279,7 @@ const historyPanel = document.getElementById('moveHistory');
 const chessboard = document.getElementById('chessboard');
 const promotionPopup = document.getElementById('promotionPopup');
 
-// SVG file mapping by piece type and color
+// Pieces (adjust paths if needed)
 const pieceSvgMap = {
   PAWN:   { white: "images/White_Pawn.svg",   black: "images/Black_Pawn.svg" },
   ROOK:   { white: "images/White_Rook.svg",   black: "images/Black_Rook.svg" },
@@ -289,9 +289,8 @@ const pieceSvgMap = {
   KING:   { white: "images/White_King.svg",   black: "images/Black_King.svg" }
 };
 
-let gameMode = 'player';      // 'player' or 'bot'
-let playerSide = 'white';     // chosen side if bot
-let modeConfirmed = false;
+let gameMode = 'player';
+let playerSide = 'white';
 let currentTurn = 'white';
 let selected = null;
 let moveHistory = [];
@@ -302,81 +301,47 @@ let promotionMove = null;
 let gameStarted = false;
 let gameOver = false;
 
-function botSide(){
-  return playerSide === 'white' ? 'black' : 'white';
-}
+// NEW: keep previous board snapshot and a flag to coalesce updates
+let prevBoardState = null;
+let rafScheduled = false;
 
-// Update active mode button and side selector visibility
+function botSide(){ return playerSide === 'white' ? 'black' : 'white'; }
+
 function updateModeButtons() {
   pvpBtn.classList.toggle('active', gameMode === 'player');
   pvbBtn.classList.toggle('active', gameMode === 'bot');
   sideSelect.style.display = gameMode === 'bot' ? 'block' : 'none';
 }
 
-// Mode buttons handlers
-pvpBtn.onclick = () => {
-  gameMode = 'player';
-  updateModeButtons();
-};
-pvbBtn.onclick = () => {
-  gameMode = 'bot';
-  updateModeButtons();
-};
-sideSelect.onchange = () => {
-  playerSide = sideSelect.value;
-};
+pvpBtn.onclick = () => { gameMode = 'player'; updateModeButtons(); };
+pvbBtn.onclick = () => { gameMode = 'bot'; updateModeButtons(); };
+sideSelect.onchange = () => { playerSide = sideSelect.value; };
 
-// Capitalize helper
-function capitalize(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// Confirm button to start game and hide mode selection
 confirmBtn.onclick = () => {
-  modeConfirmed = true;
   modeSelectGroup.style.display = 'none';
-
   resetGame().then(success => {
     if (!success) return;
-
-    gameStarted = true;
-    gameOver = false;
-
-    // Freeze side selection & hide after start (prevents mid-game switching)
-    sideSelect.disabled = true;
-    sideSelect.style.display = 'none';
-
+    gameStarted = true; gameOver = false;
+    sideSelect.disabled = true; sideSelect.style.display = 'none';
     updateStatus(`${capitalize(currentTurn)} to move`);
-
-    // If bot should start, trigger it safely
-    if (gameMode === 'bot' && currentTurn === botSide()) {
-      setTimeout(makeBotMove, 120);
-    }
+    if (gameMode === 'bot' && currentTurn === botSide()) setTimeout(makeBotMove, 120);
   });
 };
 
-// Reset button resets game and shows mode selector again
 resetBtn.onclick = () => {
   resetGame().then(success => {
     if(!success) return;
-
-    modeConfirmed = false;
-    gameStarted = false;
-    gameOver = false;
-
     modeSelectGroup.style.display = '';
-    sideSelect.style.display = 'none';
-    sideSelect.disabled = false;
-
+    sideSelect.style.display = 'none'; sideSelect.disabled = false;
+    gameStarted = false; gameOver = false;
     updateStatus('Select mode and click Confirm to start');
-    moveHistory = [];
-    updateMoveHistory();
+    moveHistory = []; updateMoveHistory();
   });
 };
 
-function updateStatus(msg){
-  statusBar.innerHTML = msg || '';
-}
+function updateStatus(msg){ statusBar.textContent = msg || ''; }
 
 function updateMoveHistory(){
   let html = '';
@@ -389,63 +354,9 @@ function updateMoveHistory(){
   historyPanel.innerHTML = html.trim();
 }
 
-function getBoardSquare(row, col){
-  return boardState?.[row]?.[col];
-}
+function getBoardSquare(row, col){ return boardState?.[row]?.[col]; }
 
-function renderBoard(boardData){
-  chessboard.innerHTML = '';
-  chessboard.style.background = "none";
-  chessboard.style.border = "none";
-  chessboard.style.borderRadius = "0";
-  chessboard.style.boxShadow = "none";
-  chessboard.style.width = "416px";
-  chessboard.style.height = "416px";
-  chessboard.style.position = "absolute";
-  chessboard.style.top = "32px";
-  chessboard.style.left = "32px";
-  chessboard.style.display = "grid";
-  chessboard.style.gridTemplateColumns = "repeat(8, 52px)";
-  chessboard.style.gridTemplateRows = "repeat(8, 52px)";
-
-  for(let r=0; r<8; r++){
-    for(let c=0; c<8; c++){
-      const sq = document.createElement('div');
-      sq.className = 'square';
-      sq.style.background = "none";
-      sq.dataset.row = r;
-      sq.dataset.col = c;
-      sq.style.width = "52px";
-      sq.style.height = "52px";
-
-      if(lastMove && ((r === lastMove.fromRow && c === lastMove.fromCol) ||
-                      (r === lastMove.toRow && c === lastMove.toCol))) {
-        sq.classList.add('last-move');
-      }
-
-      const piece = boardData[r][c];
-      if(piece){
-        const img = document.createElement('img');
-        img.src = pieceSvgMap[piece.type][piece.color];
-        img.alt = piece.type;
-        img.style.width = "44px";
-        img.style.height = "44px";
-        img.style.pointerEvents = "none";
-        img.draggable = gameStarted && !gameOver;
-        sq.appendChild(img);
-      }
-
-      sq.addEventListener('click', () => handleSquareClick(r, c));
-      sq.addEventListener('dragover', e => e.preventDefault());
-      sq.addEventListener('drop', e => {
-        e.preventDefault();
-        handleDrop(r, c);
-      });
-
-      chessboard.appendChild(sq);
-    }
-  }
-}
+// Build static squares ONCE
 function initBoardGrid() {
   chessboard.innerHTML = '';
   chessboard.style.background = "none";
@@ -470,27 +381,76 @@ function initBoardGrid() {
       sq.dataset.col = c;
       sq.style.width = "52px";
       sq.style.height = "52px";
-
       sq.addEventListener('click', () => handleSquareClick(r, c));
       sq.addEventListener('dragover', e => e.preventDefault());
-      sq.addEventListener('drop', e => {
-        e.preventDefault();
-        handleDrop(r, c);
-      });
-
+      sq.addEventListener('drop', e => { e.preventDefault(); handleDrop(r, c); });
       chessboard.appendChild(sq);
     }
   }
 }
 
+// NEW: update only changed squares
+function renderBoard(boardData) {
+  // Defer DOM writes to the next frame for smoothness
+  if (rafScheduled) return;
+  rafScheduled = true;
+  requestAnimationFrame(() => {
+    const firstTime = !prevBoardState;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const oldPiece = firstTime ? null : prevBoardState[r][c];
+        const newPiece = boardData[r][c];
+        const isLastMoveSquare = lastMove &&
+          ((r === lastMove.fromRow && c === lastMove.fromCol) ||
+           (r === lastMove.toRow && c === lastMove.toCol));
+        // Update if new square, changed piece, or needs last-move highlight toggle
+        if (firstTime ||
+            JSON.stringify(oldPiece) !== JSON.stringify(newPiece) ||
+            isLastMoveSquare) {
+          updateSquare(r, c, newPiece, isLastMoveSquare);
+        }
+      }
+    }
+    prevBoardState = JSON.parse(JSON.stringify(boardData));
+    rafScheduled = false;
+  });
+}
+
+// Write to a single square
+function updateSquare(r, c, piece, highlight = false) {
+  const sq = chessboard.querySelector(`.square[data-row="${r}"][data-col="${c}"]`);
+  // If highlight state changed, toggle class without nuking children unnecessarily
+  if (highlight) sq.classList.add("last-move");
+  else sq.classList.remove("last-move");
+
+  // Check if existing child already matches target; if so, skip DOM churn
+  const existing = sq.firstElementChild;
+  if (piece) {
+    const desiredSrc = pieceSvgMap[piece.type][piece.color];
+    if (existing && existing.tagName === 'IMG' && existing.getAttribute('data-src') === desiredSrc) {
+      return; // image already correct; nothing to do
+    }
+    // Replace content with the correct image
+    sq.innerHTML = '';
+    const img = document.createElement("img");
+    img.src = desiredSrc;
+    img.setAttribute('data-src', desiredSrc); // tiny cache key to compare later
+    img.className = "piece";
+    img.width = 44;
+    img.height = 44;
+    img.draggable = gameStarted && !gameOver;
+    img.alt = piece.type;
+    sq.appendChild(img);
+  } else {
+    // Clear only if something was there
+    if (existing) sq.innerHTML = '';
+  }
+}
 
 function loadBoard(){
   fetch('/board')
     .then(r => r.json())
-    .then(data => {
-      boardState = data;
-      renderBoard(data);
-    });
+    .then(data => { boardState = data; renderBoard(data); });
 }
 
 function fetchValidMoves(row, col){
@@ -502,7 +462,7 @@ function fetchValidMoves(row, col){
     .then(res => {
       if(res.success){
         validMoves = res.validMoves;
-        renderBoard(boardState);
+        // do not rebuild; highlights are drawn in updateSquare
       }
     });
 }
@@ -517,31 +477,22 @@ function sendMove(move){
     .then(res => {
       if(res.success){
         currentTurn = res.currentTurn;
-        lastMove = {
-          fromRow: move.fromRow,
-          fromCol: move.fromCol,
-          toRow: move.toRow,
-          toCol: move.toCol
-        };
-        selected = null;
-        validMoves = [];
+        lastMove = { fromRow: move.fromRow, fromCol: move.fromCol, toRow: move.toRow, toCol: move.toCol };
+        selected = null; validMoves = [];
         moveHistory = res.moveHistory || moveHistory;
-        boardState = null;
-        updateMoveHistory();
+        boardState = null; updateMoveHistory();
         handleGameStatus(res.gameStatus);
-        loadBoard();
+        loadBoard(); // will diff and update only changed squares
         if(gameMode === 'bot' && currentTurn === botSide() && !gameOver){
           setTimeout(makeBotMove, 600);
         }
-      } else {
-        alert(res.message);
-      }
+      } else { alert(res.message); }
     }).catch(() => alert('Error communicating with server.'));
 }
 
 function makeBotMove(){
   if(gameOver) return;
-  if(currentTurn !== botSide()) return; // Only move when it's bot's turn
+  if(currentTurn !== botSide()) return;
   fetch('/bot-move', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -554,7 +505,7 @@ function makeBotMove(){
         moveHistory = res.moveHistory || moveHistory;
         updateMoveHistory();
         handleGameStatus(res.gameStatus);
-        loadBoard();
+        loadBoard(); // diff update
       } else {
         alert(res.message);
       }
@@ -564,9 +515,9 @@ function makeBotMove(){
 function parseMoveString(str){
   if(!str || str.length < 4) return null;
   const fromCol = str.charCodeAt(0) - 97;
-  const fromRow = 8 - (+str[1]);
+  const fromRow = 8 - (+str[10]);
   const toCol = str.charCodeAt(2) - 97;
-  const toRow = 8 - (+str[3]);
+  const toRow = 8 - (+str[11]);
   return {fromRow, fromCol, toRow, toCol};
 }
 
@@ -581,9 +532,7 @@ function handleSquareClick(row, col){
     fetchValidMoves(row, col);
   } else {
     if(selected.row === row && selected.col === col){
-      selected = null;
-      validMoves = [];
-      renderBoard(boardState);
+      selected = null; validMoves = [];
       return;
     }
     if(validMoves.some(m => m.row === row && m.col === col)){
@@ -595,9 +544,7 @@ function handleSquareClick(row, col){
         sendMove({fromRow: selected.row, fromCol: selected.col, toRow: row, toCol: col, color: selected.color});
       }
     } else {
-      selected = null;
-      validMoves = [];
-      renderBoard(boardState);
+      selected = null; validMoves = [];
     }
   }
 }
@@ -617,15 +564,8 @@ function handleDrop(row, col){
   }
 }
 
-function hidePromotion(){
-  promotionPopup.style.display = 'none';
-  promotionMove = null;
-}
-
-function showPromotion(){
-  promotionPopup.style.display = 'flex';
-}
-
+function hidePromotion(){ promotionPopup.style.display = 'none'; promotionMove = null; }
+function showPromotion(){ promotionPopup.style.display = 'flex'; }
 promotionPopup.querySelectorAll('.promotion-btn').forEach(btn => {
   btn.onclick = () => {
     if(!promotionMove) return;
@@ -636,21 +576,18 @@ promotionPopup.querySelectorAll('.promotion-btn').forEach(btn => {
 });
 
 function handleGameStatus(status){
-  if(status.startsWith('checkmate')){
+  if(status && status.startsWith('checkmate')){
     gameOver = true;
     const winner = status.includes('white') ? 'Black' : 'White';
     updateStatus(`${winner} wins by checkmate!`);
   } else if(status === 'stalemate'){
-    gameOver = true;
-    updateStatus('Game drawn by stalemate.');
+    gameOver = true; updateStatus('Game drawn by stalemate.');
   } else if(status === 'draw'){
-    gameOver = true;
-    updateStatus('Game drawn.');
-  } else if(status.startsWith('check')){
+    gameOver = true; updateStatus('Game drawn.');
+  } else if(status && status.startsWith('check')){
     updateStatus('Check!');
   } else {
-    gameOver = false;
-    updateStatus(`${capitalize(currentTurn)} to move`);
+    gameOver = false; updateStatus(`${capitalize(currentTurn)} to move`);
   }
 }
 
@@ -667,6 +604,7 @@ function resetGame(){
         boardState = null;
         gameStarted = false;
         gameOver = false;
+        prevBoardState = null; // reset snapshot
         updateMoveHistory();
         loadBoard();
         return true;
@@ -676,6 +614,7 @@ function resetGame(){
 }
 
 window.onload = () => {
+  initBoardGrid(); // build once
   updateModeButtons();
   modeSelectGroup.style.display = '';
   sideSelect.style.display = 'none';
@@ -684,5 +623,6 @@ window.onload = () => {
   loadBoard();
 };
 </script>
+
 </body>
 </html>
