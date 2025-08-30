@@ -235,12 +235,18 @@
 <div class="status-bar" id="statusBar">Select mode and click Confirm to start the game.</div>
 <div class="container">
     <div class="board-panel">
-        <div id="chessboard" class="chessboard"></div>
+        <div style="position:relative; width:480px; height:480px;">
+            <!-- Board image as background, grid overlays on top -->
+            <img src="images/chess board.png" alt="Chess Board" style="position:absolute;top:0;left:0;width:480px;height:480px;z-index:0;border-radius:10px;box-shadow:0 6px 32px #0008;">
+            <!-- The grid is sized to fit only the inner squares (8x8), not the border -->
+            <div id="chessboard" class="chessboard"
+                 style="position:absolute;top:32px;left:32px;width:416px;height:416px;z-index:1;"></div>
+        </div>
     </div>
     <div class="ui-panel">
         <div class="major-btn-group">
             <button id="resetBtn">⟳ Reset</button>
-            <button id="undoBtn" disabled>↶ Undo</button>
+            <!-- Undo button removed -->
         </div>
         <div id="modeSelectGroup" class="mode-select-group">
             <button id="pvpBtn" class="mode-btn active">Player vs Player</button>
@@ -277,7 +283,6 @@ const pvpBtn = document.getElementById('pvpBtn');
 const pvbBtn = document.getElementById('pvbBtn');
 const confirmBtn = document.getElementById('confirmModeBtn');
 const sideSelect = document.getElementById('sideSelect');
-const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const botMoveBtn = document.getElementById('botMoveBtn');
 const statusBar = document.getElementById('statusBar');
@@ -356,8 +361,6 @@ confirmBtn.onclick = () => {
       botMoveBtn.style.display = 'none';
       sideSelect.style.display = 'none';
     }
-
-    undoBtn.disabled = true;
   });
 };
 
@@ -377,8 +380,6 @@ resetBtn.onclick = () => {
     updateStatus('Select mode and click Confirm to start');
     moveHistory = [];
     updateMoveHistory();
-
-    undoBtn.disabled = true;
   });
 };
 
@@ -395,7 +396,38 @@ function updateMoveHistory(){
     html += `<span>${moveNumber}. ${whiteMove} ${blackMove}</span> `;
   }
   historyPanel.innerHTML = html.trim();
-  undoBtn.disabled = !gameStarted || moveHistory.length === 0;
+}
+
+// --- Add board coordinates rendering ---
+function renderBoardCoordinates() {
+  const coordsDiv = document.getElementById('boardCoords');
+  coordsDiv.innerHTML = '';
+  const files = ['a','b','c','d','e','f','g','h'];
+  const ranks = ['8','7','6','5','4','3','2','1'];
+  // Files (bottom)
+  for(let c=0; c<8; c++){
+    const fileLabel = document.createElement('div');
+    fileLabel.textContent = files[c];
+    fileLabel.style.position = 'absolute';
+    fileLabel.style.left = `${c*56+4}px`;
+    fileLabel.style.bottom = '-22px';
+    fileLabel.style.fontSize = '1em';
+    fileLabel.style.color = '#b9c7a7';
+    fileLabel.style.fontWeight = '700';
+    coordsDiv.appendChild(fileLabel);
+  }
+  // Ranks (left)
+  for(let r=0; r<8; r++){
+    const rankLabel = document.createElement('div');
+    rankLabel.textContent = ranks[r];
+    rankLabel.style.position = 'absolute';
+    rankLabel.style.top = `${r*56+8}px`;
+    rankLabel.style.left = '-22px';
+    rankLabel.style.fontSize = '1em';
+    rankLabel.style.color = '#b9c7a7';
+    rankLabel.style.fontWeight = '700';
+    coordsDiv.appendChild(rankLabel);
+  }
 }
 
 function getBoardSquare(row, col){
@@ -404,13 +436,29 @@ function getBoardSquare(row, col){
 
 function renderBoard(boardData){
   chessboard.innerHTML = '';
+  // Remove background from grid, let image show through
+  chessboard.style.background = "none";
+  chessboard.style.border = "none";
+  chessboard.style.borderRadius = "0";
+  chessboard.style.boxShadow = "none";
+  chessboard.style.width = "416px";
+  chessboard.style.height = "416px";
+  chessboard.style.position = "absolute";
+  chessboard.style.top = "32px";
+  chessboard.style.left = "32px";
+  chessboard.style.display = "grid";
+  chessboard.style.gridTemplateColumns = "repeat(8, 52px)";
+  chessboard.style.gridTemplateRows = "repeat(8, 52px)";
+
   for(let r=0; r<8; r++){
     for(let c=0; c<8; c++){
       const sq = document.createElement('div');
-      const isLight = (r+c)%2 === 0;
-      sq.className = 'square ' + (isLight ? 'white' : 'black');
+      sq.className = 'square';
+      sq.style.background = "none"; // No color, let image show
       sq.dataset.row = r;
       sq.dataset.col = c;
+      sq.style.width = "52px";
+      sq.style.height = "52px";
 
       if(lastMove && ((r === lastMove.fromRow && c === lastMove.fromCol) ||
                       (r === lastMove.toRow && c === lastMove.toCol))) {
@@ -636,27 +684,6 @@ function resetGame(){
     });
 }
 
-undoBtn.onclick = () => {
-  if(!gameStarted || gameOver) return;
-  fetch('/undo', {method:'POST'})
-    .then(r => r.json())
-    .then(res => {
-      if(res.success){
-        moveHistory = res.moveHistory || [];
-        currentTurn = res.currentTurn || currentTurn;
-        lastMove = null;
-        selected = null;
-        validMoves = [];
-        gameOver = false;
-        updateMoveHistory();
-        handleGameStatus(res.gameStatus);
-        loadBoard();
-      } else {
-        alert(res.message);
-      }
-    });
-};
-
 botMoveBtn.onclick = () => {
   if(!gameStarted || gameOver) return;
   makeBotMove();
@@ -664,14 +691,13 @@ botMoveBtn.onclick = () => {
 
 window.onload = () => {
   updateModeButtons();
-  undoBtn.disabled = true;
   modeSelectGroup.style.display = '';
   botMoveBtn.style.display = 'none';
   sideSelect.style.display = 'none';
   updateStatus('Select mode and click Confirm to start');
   loadBoard();
+  // renderBoardCoordinates(); // REMOVE
 };
-
 </script>
 </body>
 </html>
