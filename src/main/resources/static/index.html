@@ -51,21 +51,12 @@
     }
     .white { background: var(--light-square); }
     .black { background: var(--dark-square); }
-    .selected { box-shadow: 0 0 0 4px var(--highlight) inset; }
-    .valid-move { box-shadow: 0 0 0 4px var(--valid-move) inset; }
+    /* Removed piece highlight borders */
+    .selected { box-shadow: none !important; }
+    .valid-move { box-shadow: none !important; }
+    .capture::before { display: none !important; }
     .last-move { background: var(--last-move) !important; }
-    .capture::before {
-        content: "";
-        position: absolute;
-        left: 0; top: 0;
-        width: 100%; height: 100%;
-        border-radius: 50%;
-        background: var(--capture-move);
-        z-index: 1;
-    }
-    .piece {
-        z-index: 2;
-    }
+    .piece { z-index: 2; }
     .white-piece {
         color: #fff !important;
         text-shadow: 0 1px 4px #adadad22, 0 0 1px #9997;
@@ -246,7 +237,6 @@
     <div class="ui-panel">
         <div class="major-btn-group">
             <button id="resetBtn">⟳ Reset</button>
-            <!-- Undo button removed -->
         </div>
         <div id="modeSelectGroup" class="mode-select-group">
             <button id="pvpBtn" class="mode-btn active">Player vs Player</button>
@@ -261,7 +251,7 @@
             <div style="margin-bottom:5px;font-weight:600;">Move History</div>
             <div id="moveHistory" class="move-history"></div>
         </div>
-        <button id="botMoveBtn" style="display:none;">Make Bot Move</button>
+        <!-- Removed Make Bot Move button -->
     </div>
 </div>
 <div id="promotionPopup" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;background:rgba(20,20,30,0.7);z-index:20;">
@@ -277,27 +267,26 @@
 </div>
 
 <script>
-    // Get references to DOM elements
+// Get references to DOM elements
 const modeSelectGroup = document.getElementById('modeSelectGroup');
 const pvpBtn = document.getElementById('pvpBtn');
 const pvbBtn = document.getElementById('pvbBtn');
 const confirmBtn = document.getElementById('confirmModeBtn');
 const sideSelect = document.getElementById('sideSelect');
 const resetBtn = document.getElementById('resetBtn');
-const botMoveBtn = document.getElementById('botMoveBtn');
 const statusBar = document.getElementById('statusBar');
 const historyPanel = document.getElementById('moveHistory');
 const chessboard = document.getElementById('chessboard');
 const promotionPopup = document.getElementById('promotionPopup');
 
-// Unicode symbols mapping by piece type and color
-const pieceUnicode = {
-  PAWN:   { white: "♙", black: "♟" },
-  ROOK:   { white: "♖", black: "♜" },
-  KNIGHT: { white: "♘", black: "♞" },
-  BISHOP: { white: "♗", black: "♝" },
-  QUEEN:  { white: "♕", black: "♛" },
-  KING:   { white: "♔", black: "♚" }
+// SVG file mapping by piece type and color
+const pieceSvgMap = {
+  PAWN:   { white: "images/White_Pawn.svg",   black: "images/Black_Pawn.svg" },
+  ROOK:   { white: "images/White_Rook.svg",   black: "images/Black_Rook.svg" },
+  KNIGHT: { white: "images/White_Knight.svg", black: "images/Black_Knight.svg" },
+  BISHOP: { white: "images/White_Bishop.svg", black: "images/Black_Bishop.svg" },
+  QUEEN:  { white: "images/White_Queen.svg",  black: "images/Black_Queen.svg" },
+  KING:   { white: "images/White_King.svg",   black: "images/Black_King.svg" }
 };
 
 let gameMode = 'player';      // 'player' or 'bot'
@@ -312,6 +301,10 @@ let boardState = null;
 let promotionMove = null;
 let gameStarted = false;
 let gameOver = false;
+
+function botSide(){
+  return playerSide === 'white' ? 'black' : 'white';
+}
 
 // Update active mode button and side selector visibility
 function updateModeButtons() {
@@ -349,17 +342,15 @@ confirmBtn.onclick = () => {
     gameStarted = true;
     gameOver = false;
 
+    // Freeze side selection & hide after start (prevents mid-game switching)
+    sideSelect.disabled = true;
+    sideSelect.style.display = 'none';
+
     updateStatus(`${capitalize(currentTurn)} to move`);
 
-    if (gameMode === 'bot') {
-      botMoveBtn.style.display = 'inline-block';
-      sideSelect.style.display = 'block';
-      if (playerSide === 'black' && currentTurn === 'white') {
-        makeBotMove();
-      }
-    } else {
-      botMoveBtn.style.display = 'none';
-      sideSelect.style.display = 'none';
+    // If bot should start, trigger it safely
+    if (gameMode === 'bot' && currentTurn === botSide()) {
+      setTimeout(makeBotMove, 120);
     }
   });
 };
@@ -374,8 +365,8 @@ resetBtn.onclick = () => {
     gameOver = false;
 
     modeSelectGroup.style.display = '';
-    botMoveBtn.style.display = 'none';
     sideSelect.style.display = 'none';
+    sideSelect.disabled = false;
 
     updateStatus('Select mode and click Confirm to start');
     moveHistory = [];
@@ -398,45 +389,12 @@ function updateMoveHistory(){
   historyPanel.innerHTML = html.trim();
 }
 
-// --- Add board coordinates rendering ---
-function renderBoardCoordinates() {
-  const coordsDiv = document.getElementById('boardCoords');
-  coordsDiv.innerHTML = '';
-  const files = ['a','b','c','d','e','f','g','h'];
-  const ranks = ['8','7','6','5','4','3','2','1'];
-  // Files (bottom)
-  for(let c=0; c<8; c++){
-    const fileLabel = document.createElement('div');
-    fileLabel.textContent = files[c];
-    fileLabel.style.position = 'absolute';
-    fileLabel.style.left = `${c*56+4}px`;
-    fileLabel.style.bottom = '-22px';
-    fileLabel.style.fontSize = '1em';
-    fileLabel.style.color = '#b9c7a7';
-    fileLabel.style.fontWeight = '700';
-    coordsDiv.appendChild(fileLabel);
-  }
-  // Ranks (left)
-  for(let r=0; r<8; r++){
-    const rankLabel = document.createElement('div');
-    rankLabel.textContent = ranks[r];
-    rankLabel.style.position = 'absolute';
-    rankLabel.style.top = `${r*56+8}px`;
-    rankLabel.style.left = '-22px';
-    rankLabel.style.fontSize = '1em';
-    rankLabel.style.color = '#b9c7a7';
-    rankLabel.style.fontWeight = '700';
-    coordsDiv.appendChild(rankLabel);
-  }
-}
-
 function getBoardSquare(row, col){
   return boardState?.[row]?.[col];
 }
 
 function renderBoard(boardData){
   chessboard.innerHTML = '';
-  // Remove background from grid, let image show through
   chessboard.style.background = "none";
   chessboard.style.border = "none";
   chessboard.style.borderRadius = "0";
@@ -454,7 +412,7 @@ function renderBoard(boardData){
     for(let c=0; c<8; c++){
       const sq = document.createElement('div');
       sq.className = 'square';
-      sq.style.background = "none"; // No color, let image show
+      sq.style.background = "none";
       sq.dataset.row = r;
       sq.dataset.col = c;
       sq.style.width = "52px";
@@ -467,21 +425,16 @@ function renderBoard(boardData){
 
       const piece = boardData[r][c];
       if(piece){
-        const pieceSpan = document.createElement('span');
-        pieceSpan.className = 'piece ' + (piece.color === 'white' ? 'white-piece' : 'black-piece');
-        pieceSpan.textContent = pieceUnicode[piece.type][piece.color];
-        pieceSpan.setAttribute('draggable', gameStarted && !gameOver);
-        sq.appendChild(pieceSpan);
+        const img = document.createElement('img');
+        img.src = pieceSvgMap[piece.type][piece.color];
+        img.alt = piece.type;
+        img.style.width = "44px";
+        img.style.height = "44px";
+        img.style.pointerEvents = "none";
+        img.draggable = gameStarted && !gameOver;
+        sq.appendChild(img);
       }
-      if(selected && selected.row === r && selected.col === c){
-        sq.classList.add('selected');
-      }
-      if(validMoves.some(m => m.row === r && m.col === c)){
-        sq.classList.add('valid-move');
-        if(piece){
-          sq.classList.add('capture');
-        }
-      }
+
       sq.addEventListener('click', () => handleSquareClick(r, c));
       sq.addEventListener('dragover', e => e.preventDefault());
       sq.addEventListener('drop', e => {
@@ -493,6 +446,43 @@ function renderBoard(boardData){
     }
   }
 }
+function initBoardGrid() {
+  chessboard.innerHTML = '';
+  chessboard.style.background = "none";
+  chessboard.style.border = "none";
+  chessboard.style.borderRadius = "0";
+  chessboard.style.boxShadow = "none";
+  chessboard.style.width = "416px";
+  chessboard.style.height = "416px";
+  chessboard.style.position = "absolute";
+  chessboard.style.top = "32px";
+  chessboard.style.left = "32px";
+  chessboard.style.display = "grid";
+  chessboard.style.gridTemplateColumns = "repeat(8, 52px)";
+  chessboard.style.gridTemplateRows = "repeat(8, 52px)";
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const sq = document.createElement('div');
+      sq.className = 'square';
+      sq.style.background = "none";
+      sq.dataset.row = r;
+      sq.dataset.col = c;
+      sq.style.width = "52px";
+      sq.style.height = "52px";
+
+      sq.addEventListener('click', () => handleSquareClick(r, c));
+      sq.addEventListener('dragover', e => e.preventDefault());
+      sq.addEventListener('drop', e => {
+        e.preventDefault();
+        handleDrop(r, c);
+      });
+
+      chessboard.appendChild(sq);
+    }
+  }
+}
+
 
 function loadBoard(){
   fetch('/board')
@@ -540,7 +530,7 @@ function sendMove(move){
         updateMoveHistory();
         handleGameStatus(res.gameStatus);
         loadBoard();
-        if(gameMode === 'bot' && currentTurn !== playerSide && !gameOver){
+        if(gameMode === 'bot' && currentTurn === botSide() && !gameOver){
           setTimeout(makeBotMove, 600);
         }
       } else {
@@ -551,10 +541,11 @@ function sendMove(move){
 
 function makeBotMove(){
   if(gameOver) return;
+  if(currentTurn !== botSide()) return; // Only move when it's bot's turn
   fetch('/bot-move', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({color: currentTurn})
+    body: JSON.stringify({color: botSide()})
   }).then(r => r.json())
     .then(res => {
       if(res.success){
@@ -684,19 +675,13 @@ function resetGame(){
     });
 }
 
-botMoveBtn.onclick = () => {
-  if(!gameStarted || gameOver) return;
-  makeBotMove();
-};
-
 window.onload = () => {
   updateModeButtons();
   modeSelectGroup.style.display = '';
-  botMoveBtn.style.display = 'none';
   sideSelect.style.display = 'none';
+  sideSelect.disabled = false;
   updateStatus('Select mode and click Confirm to start');
   loadBoard();
-  // renderBoardCoordinates(); // REMOVE
 };
 </script>
 </body>
