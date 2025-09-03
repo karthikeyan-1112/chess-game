@@ -873,7 +873,7 @@
       function handleGameStatus(status) {
         if (status && status.startsWith("checkmate")) {
           gameOver = true;
-          const winner = status.includes("white") ? "Black" : "White";
+          const winner = status.includes("white") ? "White" : "Black";
           updateStatus(`${winner} wins by checkmate!`);
         } else if (status === "stalemate") {
           gameOver = true;
