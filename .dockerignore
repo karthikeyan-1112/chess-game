@@ -1,8 +1,25 @@
+# Maven build outputs
+target
+.mvn
+mvnw
+mvnw.cmd
 
+# IDE/project files
+.idea
+.vscode
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
 .git
 .gitignore
-.vscode
-.settings
-HELP
-*.md
-*.iml
+
+# Logs
+*.log
+
+# Node / frontend (if any)
+node_modules
+dist
