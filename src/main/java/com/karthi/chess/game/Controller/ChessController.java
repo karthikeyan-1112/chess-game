@@ -1,5 +1,6 @@
 package com.karthi.chess.game.Controller;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -149,7 +150,7 @@ public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, Stri
     Map<String, Object> res = new HashMap<>();
     try {
         String fen = board.getFen(); // Current position
-        StockfishClient sf = new StockfishClient("stockfish"); // or full path if needed
+        StockfishClient sf = new StockfishClient("D:\\chess-game\\src\\main\\resources\\engine\\stockfish.exe"); // or full path if needed
         sf.start();
         String bestMoveStr = sf.getBestMove(fen);
         sf.stop();
@@ -160,7 +161,7 @@ public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, Stri
             Move move;
 
             // Promotion handling
-            if (bestMoveStr.length() == 5) {
+            if (bestMoveStr.length() == 12) {
                 char promoChar = bestMoveStr.charAt(4);
                 PieceType promoType = switch (promoChar) {
                     case 'q' -> PieceType.QUEEN;
@@ -195,7 +196,7 @@ public ResponseEntity<Map<String, Object>> botMove(@RequestBody Map<String, Stri
             res.put("success", false);
             res.put("message", "No valid move found");
         }
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException e) {
         res.put("success", false);
         res.put("message", "Error: " + e.getMessage());
     }
