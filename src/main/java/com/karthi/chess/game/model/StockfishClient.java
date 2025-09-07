@@ -6,9 +6,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
-/**
- * Simple UCI client wrapper for Stockfish engine.
- */
 public class StockfishClient {
     private Process engineProcess;
     private BufferedReader reader;
@@ -16,34 +13,38 @@ public class StockfishClient {
     private final String path;
 
     public StockfishClient(String path) {
-        this.path = path;
+        this.path = resolvePath(path);
+    }
+
+    /**
+     * Resolve engine path depending on environment (local vs Docker).
+     */
+    private String resolvePath(String originalPath) {
+        // If /app/engine/stockfish exists (Docker container), use it
+        java.io.File dockerPath = new java.io.File("/app/engine/stockfish");
+        if (dockerPath.exists() && dockerPath.canExecute()) {
+            return dockerPath.getAbsolutePath();
+        }
+
+        // Otherwise fallback to local path (for dev)
+        return originalPath;
     }
 
     /**
      * Start the Stockfish engine process.
      */
     public boolean start() throws IOException {
-        // Using ProcessBuilder is safer than Runtime.exec
-        engineProcess = new ProcessBuilder(path).start();
+        engineProcess = new ProcessBuilder(path).redirectErrorStream(true).start();
         reader = new BufferedReader(new InputStreamReader(engineProcess.getInputStream()));
         writer = new BufferedWriter(new OutputStreamWriter(engineProcess.getOutputStream()));
         return true;
     }
 
-    /**
-     * Send a raw command to the Stockfish process.
-     */
     public void sendCommand(String cmd) throws IOException {
         writer.write(cmd + "\n");
         writer.flush();
     }
 
-    /**
-     * Get the best move from the current position (FEN).
-     *
-     * @param fen Position in Forsyth–Edwards Notation.
-     * @return Best move in UCI format, or null if not found.
-     */
     public String getBestMove(String fen) throws IOException, InterruptedException {
         sendCommand("ucinewgame");
         sendCommand("position fen " + fen);
@@ -55,17 +56,15 @@ public class StockfishClient {
             if (line.startsWith("bestmove")) {
                 return line.split(" ")[1];
             }
-            // Timeout safeguard: stop waiting if > 1 sec
             if (System.currentTimeMillis() - start > 1000) break;
         }
         return null;
     }
 
-    /**
-     * Stop the Stockfish engine process gracefully.
-     */
     public void stop() throws IOException {
-        sendCommand("quit");
+        try {
+            sendCommand("quit");
+        } catch (Exception ignored) {}
         reader.close();
         writer.close();
     }
