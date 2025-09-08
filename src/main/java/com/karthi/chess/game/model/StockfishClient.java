@@ -19,7 +19,7 @@ public class StockfishClient {
     /**
      * Resolve engine path depending on environment (local vs Docker).
      */
-    private String resolvePath(String originalPath) {
+   private String resolvePath(String originalPath) {
     java.io.File dockerPath = new java.io.File("/app/engine/stockfish");
 
     if (dockerPath.exists() && dockerPath.canExecute()) {
