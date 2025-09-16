@@ -67,7 +67,7 @@ public class StockfishClient {
     public void stop() throws IOException {
         try {
             sendCommand("quit");
-        } catch (Exception ignored) {}
+        } catch (IOException ignored) {}
         reader.close();
         writer.close();
     }
